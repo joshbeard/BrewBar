@@ -192,13 +192,21 @@ class BrewBarManager {
             }
         }
 
-        // Check for missing tap information and try to enrich it
-        enrichPackagesWithTapInfo(packages: packages) { enrichedPackages in
-            packages = enrichedPackages
+        // Use a synchronous approach to enrich packages with tap info
+        // Rather than using completion handler that doesn't get awaited properly
+        let semaphore = DispatchSemaphore(value: 0)
+        var enrichedPackages = packages
+
+        enrichPackagesWithTapInfo(packages: packages) { updatedPackages in
+            enrichedPackages = updatedPackages
+            semaphore.signal()
         }
 
+        // Wait for enrichment to complete (with timeout)
+        _ = semaphore.wait(timeout: .now() + 3.0)  // 3 second timeout
+
         LoggingUtility.shared.log("Total packages parsed: \(packages.count)")
-        return packages
+        return enrichedPackages
     }
 
     // Helper method to enrich packages with tap information asynchronously
