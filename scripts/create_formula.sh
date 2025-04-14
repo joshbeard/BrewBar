@@ -61,11 +61,12 @@ cask "brewbar" do
 
   app "BrewBar.app"
 
+  # Remove quarantine attribute
   postflight do
-    set_ownership ["/Applications/BrewBar.app"]
-    system_command "/usr/bin/xattr",
-                  args: ["-cr", "/Applications/BrewBar.app"],
-                  sudo: false
+    system "xattr", "-d", "com.apple.quarantine", "#{appdir}/BrewBar.app"
+  rescue
+    # In case xattr command fails (which can happen if the attribute doesn't exist)
+    nil
   end
 
   zap trash: [
