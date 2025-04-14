@@ -681,8 +681,9 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
         // Reload the table view
         loadCustomIntervalsIntoTable()
 
-        // Force the app delegate to rebuild its interval options
+        // Force the app delegate to rebuild its interval options and update the menu
         appDelegate.scheduleUpdateTimer()
+        appDelegate.menuBarManager.rebuildIntervalSubmenuItems()
     }
 
     @objc func removeCustomInterval(_ sender: NSButton) {
@@ -706,8 +707,9 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
             // Reload the table view
             loadCustomIntervalsIntoTable()
 
-            // Force the app delegate to rebuild its interval options
+            // Force the app delegate to rebuild its interval options and update the menu
             appDelegate.scheduleUpdateTimer()
+            appDelegate.menuBarManager.rebuildIntervalSubmenuItems()
         }
     }
 
@@ -769,6 +771,13 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
         guard let appDelegate = appDelegate,
               let popup = windowController?.window?.contentView?.viewWithTag(2001) as? NSPopUpButton else {
             return
+        }
+
+        // Rebuild the popup items first
+        popup.removeAllItems()
+        for (name, interval) in appDelegate.intervalOptions.sorted(by: { $0.value < $1.value }) {
+            popup.addItem(withTitle: name)
+            popup.lastItem?.representedObject = interval
         }
 
         // Find and select the current interval

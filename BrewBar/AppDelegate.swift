@@ -7,7 +7,7 @@ import ServiceManagement
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // Managers
-    private var menuBarManager: MenuBarManager!
+    var menuBarManager: MenuBarManager!
     private var terminalWindowController: TerminalWindowController?
     private var preferencesWindowController: PreferencesWindowController?
 
@@ -175,6 +175,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // Update the menubar submenu to reflect the change
         menuBarManager.updateCheckIntervalSubmenu()
+        menuBarManager.rebuildIntervalSubmenuItems()
 
         // Post notification for other interested views
         NotificationCenter.default.post(name: NSNotification.Name("IntervalChanged"), object: nil)
@@ -194,6 +195,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // Update the menubar submenu to reflect the change
         menuBarManager.updateCheckIntervalSubmenu()
+        menuBarManager.rebuildIntervalSubmenuItems()
 
         // Post notification for other interested views
         NotificationCenter.default.post(name: NSNotification.Name("IntervalChanged"), object: nil)
@@ -261,20 +263,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             checkNow: { [weak self, weak viewState] in
                 // Set window to checking state first
                 viewState?.isCheckingForUpdates = true
-                LoggingUtility.shared.log("DEBUG: Set viewState.isCheckingForUpdates = true")
+                LoggingUtility.shared.log("DEBUG: Window CheckNow: Set viewState.isCheckingForUpdates = true")
 
-                // Run the check for updates
-                LoggingUtility.shared.log("DEBUG: Starting checkForUpdates()")
-                self?.checkForUpdates(displayOutput: false)
-                LoggingUtility.shared.log("DEBUG: checkForUpdates() initiated")
-
-                // Wait a moment for the check to complete and then refresh the view
-                // Increase delay to 3 seconds to ensure check has time to complete
-                LoggingUtility.shared.log("DEBUG: Scheduling refreshPackagesWindow() in 3 seconds")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    LoggingUtility.shared.log("DEBUG: Async timer fired - calling refreshPackagesWindow()")
+                // Run the check for updates, refresh window on completion
+                LoggingUtility.shared.log("DEBUG: Window CheckNow: Starting checkForUpdates()")
+                self?.checkForUpdates(displayOutput: true) { // Pass true for displayOutput
+                    // This block executes *after* checkForUpdates is complete
+                    LoggingUtility.shared.log("DEBUG: Window CheckNow: checkForUpdates completed, calling refreshPackagesWindow()")
+                    // Use weak self here as well
                     self?.refreshPackagesWindow(viewState: viewState)
                 }
+                LoggingUtility.shared.log("DEBUG: Window CheckNow: checkForUpdates() initiated with completion handler")
             }
         )
 
@@ -337,20 +336,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 checkNow: { [weak self, weak viewState] in
                     // Set window to checking state first
                     viewState?.isCheckingForUpdates = true
-                    LoggingUtility.shared.log("DEBUG: Set viewState.isCheckingForUpdates = true")
+                    LoggingUtility.shared.log("DEBUG: Window CheckNow (nested): Set viewState.isCheckingForUpdates = true")
 
-                    // Run the check for updates
-                    LoggingUtility.shared.log("DEBUG: Starting checkForUpdates()")
-                    self?.checkForUpdates(displayOutput: false)
-                    LoggingUtility.shared.log("DEBUG: checkForUpdates() initiated")
-
-                    // Wait a moment for the check to complete and then refresh the view
-                    // Increase delay to 3 seconds to ensure check has time to complete
-                    LoggingUtility.shared.log("DEBUG: Scheduling refreshPackagesWindow() in 3 seconds")
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                        LoggingUtility.shared.log("DEBUG: Async timer fired - calling refreshPackagesWindow()")
+                    // Run the check for updates, refresh window on completion
+                    LoggingUtility.shared.log("DEBUG: Window CheckNow (nested): Starting checkForUpdates()")
+                    self?.checkForUpdates(displayOutput: true) { // Pass true for displayOutput
+                        // This block executes *after* checkForUpdates is complete
+                        LoggingUtility.shared.log("DEBUG: Window CheckNow (nested): checkForUpdates completed, calling refreshPackagesWindow()")
+                        // Use weak self here as well
                         self?.refreshPackagesWindow(viewState: viewState)
                     }
+                    LoggingUtility.shared.log("DEBUG: Window CheckNow (nested): checkForUpdates() initiated with completion handler")
                 }
             )
 
@@ -388,7 +384,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         checkForUpdates(displayOutput: true)
     }
 
-    func checkForUpdates(displayOutput: Bool = false) {
+    func checkForUpdates(displayOutput: Bool = false, completion: (() -> Void)? = nil) {
         // If an update check is already running, cancel it before starting a new one.
         BrewBarManager.shared.updateCheckTask?.interrupt()
         BrewBarManager.shared.updateCheckTask = nil
@@ -570,11 +566,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         }
                     }
 
-                    self.currentOutdatedPackages = packages
-                    self.menuBarManager.updateMenu(outdatedPackages: packages, errorOccurred: encounteredError)
+                    // Enrich packages with source information before updating UI
+                    BrewBarManager.shared.enrichOutdatedPackagesWithSource(packages: packages) { [weak self] enrichedPackages in
+                        guard let self = self else { return }
 
-                    if displayOutput {
-                        self.terminalWindowController?.appendOutput("\nCheck completed at \(DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium))\n", color: NSColor.systemBlue)
+                        // Update state with enriched packages
+                        self.currentOutdatedPackages = enrichedPackages
+                        self.menuBarManager.updateMenu(outdatedPackages: enrichedPackages, errorOccurred: encounteredError)
+
+                        // Update terminal window if displayed
+                        if displayOutput {
+                            self.terminalWindowController?.appendOutput("\nCheck completed at \(DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium))\n", color: NSColor.systemBlue)
+                        }
+
+                        // Call the completion handler if provided (AFTER enrichment)
+                        completion?()
                     }
                 }
             }
@@ -594,6 +600,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 if let showOutdatedItem = self.menuBarManager.menu?.item(withTitle: "Show Outdated Packages...") {
                     showOutdatedItem.isEnabled = true
                 }
+
+                // Call completion handler even on error
+                completion?()
             }
         }
     }
@@ -842,12 +851,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // Helper to refresh the packages window with the latest data
     private func refreshPackagesWindow(viewState: PackageViewState?) {
-        LoggingUtility.shared.log("DEBUG: ⭐️ refreshPackagesWindow() called")
+        LoggingUtility.shared.log("DEBUG: refreshPackagesWindow called")
 
+        // Safety check for window controller and content view
         guard let windowController = outdatedPackagesWindowController,
               let window = windowController.window,
               let contentVC = window.contentViewController as? NSHostingController<OutdatedPackagesView> else {
-            LoggingUtility.shared.log("ERROR: Could not refresh packages window - controller or view not available")
+            LoggingUtility.shared.log("DEBUG: Window controller or content view not available")
+
+            // Always reset the spinner if viewState was provided, even if window is gone
+            DispatchQueue.main.async {
+                viewState?.isCheckingForUpdates = false
+                LoggingUtility.shared.log("DEBUG: Reset spinner state even though window was gone")
+            }
+
             return
         }
 
@@ -866,6 +883,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         BrewBarManager.shared.fetchInstalledPackages { [weak self] packages in
             guard let self = self else {
                 LoggingUtility.shared.log("DEBUG: self was nil in completion handler")
+                // In case there's a viewState, make sure to turn off spinner
+                DispatchQueue.main.async {
+                    viewState?.isCheckingForUpdates = false
+                }
                 return
             }
 
@@ -894,26 +915,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 // Also force viewState to be off, for good measure
                 contentVC.rootView.viewState.isCheckingForUpdates = false
                 LoggingUtility.shared.log("DEBUG: View updated and viewState.isCheckingForUpdates set to false")
-            }
-        }
-
-        // As a fallback, ensure we turn off the spinner after a timeout
-        // in case fetching installed packages fails
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
-            LoggingUtility.shared.log("DEBUG: ⏱️ 5-second timeout check running")
-
-            guard let self = self,
-                  let window = self.outdatedPackagesWindowController?.window,
-                  let contentVC = window.contentViewController as? NSHostingController<OutdatedPackagesView> else {
-                LoggingUtility.shared.log("DEBUG: Controller or view not available for timeout check")
-                return
-            }
-
-            // Force turn off the checking state no matter what
-            DispatchQueue.main.async {
-                LoggingUtility.shared.log("DEBUG: Forcing spinner off in timeout handler")
-                contentVC.rootView.viewState.isCheckingForUpdates = false
-                LoggingUtility.shared.log("DEBUG: Spinner forced off by timeout handler")
             }
         }
     }

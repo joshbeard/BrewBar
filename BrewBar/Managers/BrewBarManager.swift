@@ -35,7 +35,7 @@ class BrewBarManager {
         }
     }
 
-    // Helper method to parse package information with versions
+    // Helper method to parse package information with versions from `brew outdated` output
     func parsePackagesWithVersions(from output: String) -> [PackageInfo] {
         var packages: [PackageInfo] = []
         let lines = output.components(separatedBy: "\n")
@@ -44,52 +44,35 @@ class BrewBarManager {
 
         for line in lines {
             // Skip empty lines or lines with our custom output
-            if line.isEmpty || line.contains("Checking for") || line.contains("Running:") {
+            if line.isEmpty || line.contains("Checking for") || line.contains("Running:") || line.contains("==> Outdated") {
                 continue
             }
 
-            // Check for tap/cask information
-            var source = ""
+            // Basic parsing: Assume format "package_name (current_version) != available_version [other_info]"
+            // Or                 "package_name (current_version) < available_version [other_info]"
+            // Or                 "package_name current_version -> available_version"
 
-            // Look for tap information with improved detection
-            if line.contains("homebrew/cask") {
-                source = "cask"
-            } else if line.contains("homebrew/core") {
-                source = "core"
-            } else {
-                // Look for other tap markers with enhanced pattern matching
-                // First check for pattern like "[tap/name]"
-                if let tapRange = line.range(of: "\\[.+?\\]", options: .regularExpression) {
-                    source = String(line[tapRange]).trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
-                }
-                // Check for pattern like "from tap/name"
-                else if let fromRange = line.range(of: "from [^\\s]+", options: .regularExpression) {
-                    let fromText = String(line[fromRange])
-                    source = fromText.replacingOccurrences(of: "from ", with: "")
-                }
-                // Additional pattern to catch "tap_name/formula_name"
-                else if let range = line.range(of: "/[^\\s)]+", options: .regularExpression) {
-                    let fullPath = String(line[range.lowerBound..<range.upperBound])
-                    let components = fullPath.components(separatedBy: "/")
-                    if components.count >= 2 {
-                        // Keep the full tap path instead of just the first component
-                        // We need to remove the leading slash and retain the rest
-                        source = fullPath.hasPrefix("/") ? String(fullPath.dropFirst()) : fullPath
-                    }
-                }
-            }
-
-            // Try to parse version information with various patterns
             var packageName = ""
             var currentVersion = ""
             var availableVersion = ""
             var matched = false
 
-            // Pattern 1: Standard format like "ffmpeg (6.0_1) < 6.1"
-            if let regex = try? NSRegularExpression(pattern: "([^ ]+) \\(([^)]+)\\) < (.+?)($| |\\[)") {
+            // Pattern 1: (version) != new_version or < new_version
+            if let regex = try? NSRegularExpression(pattern: "^([^ ]+) \\(([^)]+)\\) (!=|\\<) ([^ \\[]+)") {
                 let nsString = line as NSString
                 let matches = regex.matches(in: line, range: NSRange(location: 0, length: nsString.length))
+                if let match = matches.first, match.numberOfRanges >= 5 {
+                    packageName = nsString.substring(with: match.range(at: 1))
+                    currentVersion = nsString.substring(with: match.range(at: 2))
+                    availableVersion = nsString.substring(with: match.range(at: 4))
+                    matched = true
+                }
+            }
 
+            // Pattern 2: current_version -> new_version (often used for casks or complex updates)
+            if !matched, let regex = try? NSRegularExpression(pattern: "^([^ ]+)\\s+([^ ]+)\\s+->\\s+([^ ]+)") {
+                let nsString = line as NSString
+                let matches = regex.matches(in: line, range: NSRange(location: 0, length: nsString.length))
                 if let match = matches.first, match.numberOfRanges >= 4 {
                     packageName = nsString.substring(with: match.range(at: 1))
                     currentVersion = nsString.substring(with: match.range(at: 2))
@@ -98,190 +81,155 @@ class BrewBarManager {
                 }
             }
 
-            // Pattern 2: Format with arrow like "ffmpeg 6.0_1 -> 6.1"
-            if !matched, let regex = try? NSRegularExpression(pattern: "([^ ]+)\\s+([^ ]+)\\s+->\\s+([^ ]+)") {
-                let nsString = line as NSString
-                let matches = regex.matches(in: line, range: NSRange(location: 0, length: nsString.length))
-
-                if let match = matches.first, match.numberOfRanges >= 4 {
-                    packageName = nsString.substring(with: match.range(at: 1))
-                    currentVersion = nsString.substring(with: match.range(at: 2))
-                    availableVersion = nsString.substring(with: match.range(at: 3))
-                    matched = true
-                }
+            // Pattern 3: Catch simple names where versions might be missing or weird (fallback)
+            if !matched, let firstWord = line.components(separatedBy: " ").first, !firstWord.isEmpty {
+                 packageName = firstWord
+                 // Leave versions empty, enrichment step will handle if possible
+                 currentVersion = "?"
+                 availableVersion = "?"
+                 matched = true // Mark as matched to add to list
             }
 
-            // Pattern 3: Handle special version cases like "beta" versions
-            if !matched, let regex = try? NSRegularExpression(pattern: "([^ ]+)\\s+\\((.+?)\\)(\\s+.+?|$)") {
-                let nsString = line as NSString
-                let matches = regex.matches(in: line, range: NSRange(location: 0, length: nsString.length))
-
-                if let match = matches.first, match.numberOfRanges >= 3 {
-                    packageName = nsString.substring(with: match.range(at: 1))
-                    currentVersion = nsString.substring(with: match.range(at: 2))
-
-                    // Try to find available version after the current version
-                    if let availRange = line.range(of: "\\s+[a-zA-Z0-9._-]+$", options: .regularExpression) {
-                        availableVersion = String(line[availRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    } else {
-                        // If no clear available version, mark as "new version"
-                        availableVersion = "new version"
-                    }
-
-                    matched = true
-                }
-            }
-
-            // If no patterns matched, try to extract the package name at minimum
-            if !matched {
-                // Remove potential known prefixes like "homebrew/cask/"
-                let cleanLine = line.replacingOccurrences(of: "homebrew/cask/", with: "")
-                                    .replacingOccurrences(of: "homebrew/core/", with: "")
-
-                // Get the first word as package name
-                if let firstWord = cleanLine.components(separatedBy: " ").first, !firstWord.isEmpty {
-                    packageName = firstWord
-
-                    // Try to extract a version-like string
-                    if let versionRange = cleanLine.range(of: "\\d+[\\d._-]+\\w*", options: .regularExpression) {
-                        let versionString = String(cleanLine[versionRange])
-
-                        if cleanLine.contains("->") {
-                            // If there's an arrow, figure out which side is current vs. available
-                            let parts = cleanLine.components(separatedBy: "->").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                            if parts.count >= 2 {
-                                currentVersion = parts[0].components(separatedBy: " ").last ?? "?"
-                                availableVersion = parts[1].components(separatedBy: " ").first ?? "?"
-                            } else {
-                                currentVersion = "?"
-                                availableVersion = versionString
-                            }
-                        } else {
-                            currentVersion = "?"
-                            availableVersion = versionString
-                        }
-                    } else {
-                        currentVersion = "?"
-                        availableVersion = "?"
-                    }
-                }
-            }
-
-            // Clean up the package name to handle tap prefixes in the name
-            if packageName.contains("/") {
-                let components = packageName.components(separatedBy: "/")
-                if components.count >= 2 {
-                    // If source is empty, use the tap part as source
-                    if source.isEmpty {
-                        source = components[0]
-                    }
-                    // Use the last component as the package name
-                    packageName = components.last ?? packageName
-                }
-            }
 
             // Only add if we got a package name
-            if !packageName.isEmpty {
+            if matched && !packageName.isEmpty {
                 let packageInfo = PackageInfo(
                     name: packageName,
                     currentVersion: currentVersion,
                     availableVersion: availableVersion,
-                    source: source
+                    source: "" // Source will be determined later
                 )
                 packages.append(packageInfo)
+            } else if !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                LoggingUtility.shared.log("Skipping unparsed line: \(line)")
             }
         }
 
-        // Use a synchronous approach to enrich packages with tap info
-        // Rather than using completion handler that doesn't get awaited properly
-        let semaphore = DispatchSemaphore(value: 0)
-        var enrichedPackages = packages
-
-        enrichPackagesWithTapInfo(packages: packages) { updatedPackages in
-            enrichedPackages = updatedPackages
-            semaphore.signal()
-        }
-
-        // Wait for enrichment to complete (with timeout)
-        _ = semaphore.wait(timeout: .now() + 3.0)  // 3 second timeout
-
-        LoggingUtility.shared.log("Total packages parsed: \(packages.count)")
-        return enrichedPackages
+        LoggingUtility.shared.log("Finished parsing \(packages.count) outdated packages (pre-enrichment)")
+        return packages
     }
 
     // Helper method to enrich packages with tap information asynchronously
+    // THIS FUNCTION IS DEPRECATED and will be removed. Use enrichOutdatedPackagesWithSource instead.
     func enrichPackagesWithTapInfo(packages: [PackageInfo], completion: @escaping ([PackageInfo]) -> Void) {
-        // Skip if no packages to process
+        // ... function body remains but should not be called ...
+        LoggingUtility.shared.log("WARNING: Deprecated enrichPackagesWithTapInfo called.")
+        completion(packages) // Immediately return original packages
+    }
+
+    // Structs for parsing `brew info --json=v2 --installed`
+    struct BrewInfoV2: Decodable {
+        let formulae: [FormulaInfo]
+        let casks: [CaskInfo]
+    }
+    struct FormulaInfo: Decodable {
+        let name: String
+        let full_name: String
+        let tap: String? // e.g., "homebrew/core"
+        // Add other fields if needed
+    }
+    struct CaskInfo: Decodable {
+        let token: String // This is the primary name/ID for casks
+        let full_token: String
+        let tap: String? // e.g., "homebrew/cask"
+        // Add other fields if needed
+    }
+
+    // Enrich outdated packages with their source (formula/cask) using brew info
+    func enrichOutdatedPackagesWithSource(packages: [PackageInfo], completion: @escaping ([PackageInfo]) -> Void) {
         if packages.isEmpty {
-            completion(packages)
+            LoggingUtility.shared.log("Enrichment: No packages to enrich.")
+            completion([])
             return
         }
 
-        // Only process packages without source info
-        let packagesToProcess = packages.filter { $0.source.isEmpty }
-        if packagesToProcess.isEmpty {
-            completion(packages)
-            return
-        }
+        LoggingUtility.shared.log("Enrichment: Starting source enrichment for \(packages.count) packages.")
 
-        LoggingUtility.shared.log("Starting async tap enrichment for \(packagesToProcess.count) packages")
-
-        // Create a copy of packages to work with in background thread
-        let packagesCopy = packages
-
-        // Create a dispatch group to track all package info requests
+        // Get installed formulas and casks first to use as reference
         let dispatchGroup = DispatchGroup()
-        var updatedPackages = [PackageInfo]()
-        let packagesLock = NSLock() // Thread safety for concurrent access
+        var installedFormulae = Set<String>()
+        var installedCasks = Set<String>()
 
-        // Process in background
-        for package in packagesCopy where package.source.isEmpty {
-            var updatedPackage = package
-
-            dispatchGroup.enter()
-            // Use brew info to get package details with JSON format
-            BrewBarUtility.shared.runBrewCommand(["info", "--json=v1", package.name]) { infoStr, status, error in
-                defer { dispatchGroup.leave() }
-
-                if let error = error {
-                    LoggingUtility.shared.log("Error running brew info for \(package.name): \(error.localizedDescription)")
-                } else if let infoOutput = infoStr, status == 0 {
-                    // Check if there's a "tap" field in the JSON output
-                    if infoOutput.contains("\"tap\":") {
-                        // Simple extraction using string search
-                        if let range = infoOutput.range(of: "\"tap\":\\s*\"([^\"]+)\"", options: .regularExpression) {
-                            let match = infoOutput[range]
-                            if let tapRange = match.range(of: "\"[^\"]+\"", options: .regularExpression, range: match.index(match.startIndex, offsetBy: 6)..<match.endIndex) {
-                                let tap = infoOutput[tapRange].trimmingCharacters(in: CharacterSet(charactersIn: "\""))
-                                updatedPackage = PackageInfo(
-                                    name: package.name,
-                                    currentVersion: package.currentVersion,
-                                    availableVersion: package.availableVersion,
-                                    source: tap
-                                )
-                            }
-                        }
-                    }
+        // Get installed formulas
+        dispatchGroup.enter()
+        BrewBarUtility.shared.runBrewCommand(["list", "--formula"]) { output, status, error in
+            defer { dispatchGroup.leave() }
+            if let formulaOutput = output, status == 0 {
+                formulaOutput.split(separator: "\n").forEach { name in
+                    installedFormulae.insert(String(name))
                 }
-
-                // Safely add to the results array
-                packagesLock.lock()
-                updatedPackages.append(updatedPackage)
-                packagesLock.unlock()
+                LoggingUtility.shared.log("Found \(installedFormulae.count) installed formulas")
             }
         }
 
-        dispatchGroup.notify(queue: .main) {
-            // Update the original packages with the enriched info
-            var enrichedPackages = packages
-            for (index, package) in enrichedPackages.enumerated() {
-                if package.source.isEmpty {
-                    if let updatedPackage = updatedPackages.first(where: { $0.name == package.name && !$0.source.isEmpty }) {
-                        enrichedPackages[index] = updatedPackage
-                    }
+        // Get installed casks
+        dispatchGroup.enter()
+        BrewBarUtility.shared.runBrewCommand(["list", "--cask"]) { output, status, error in
+            defer { dispatchGroup.leave() }
+            if let caskOutput = output, status == 0 {
+                caskOutput.split(separator: "\n").forEach { name in
+                    installedCasks.insert(String(name))
                 }
+                LoggingUtility.shared.log("Found \(installedCasks.count) installed casks")
             }
-            completion(enrichedPackages)
+        }
+
+        // After we have both lists
+        dispatchGroup.notify(queue: .global(qos: .userInitiated)) {
+            // Now enrich each package
+            var enrichedPackages = packages
+
+            for i in 0..<enrichedPackages.count {
+                let packageName = enrichedPackages[i].name
+
+                // Simple, straightforward source determination
+                if installedCasks.contains(packageName) {
+                    enrichedPackages[i].source = "cask"
+                } else if installedFormulae.contains(packageName) {
+                    enrichedPackages[i].source = "formula"
+                } else if packageName.contains("/") {
+                    // For packages with a slash, use the first part as the tap
+                    let components = packageName.components(separatedBy: "/")
+                    if components.count >= 2 {
+                        enrichedPackages[i].source = components[0]
+                    } else {
+                        enrichedPackages[i].source = "formula" // Default
+                    }
+                } else {
+                    // Directly check with brew info as a last resort
+                    var source = "formula" // Default to formula
+
+                    // Try to determine if it's a cask by running a synchronous command
+                    let task = Process()
+                    task.executableURL = URL(fileURLWithPath: BrewBarUtility.shared.brewPath ?? "/opt/homebrew/bin/brew")
+                    task.arguments = ["info", "--cask", packageName]
+
+                    // Capture exit status only, output doesn't matter
+                    task.standardOutput = FileHandle.nullDevice
+                    task.standardError = FileHandle.nullDevice
+
+                    do {
+                        try task.run()
+                        task.waitUntilExit()
+
+                        // If exit code is 0, it's a cask
+                        if task.terminationStatus == 0 {
+                            source = "cask"
+                        }
+                    } catch {
+                        // If there's an error, stay with default "formula"
+                    }
+
+                    enrichedPackages[i].source = source
+                }
+
+                LoggingUtility.shared.log("Set source for '\(packageName)' to '\(enrichedPackages[i].source)'")
+            }
+
+            // Return the enriched packages on the main thread
+            DispatchQueue.main.async {
+                completion(enrichedPackages)
+            }
         }
     }
 

@@ -7,7 +7,7 @@ struct PackageInfo: Identifiable, Hashable {
     let name: String
     let currentVersion: String
     let availableVersion: String
-    let source: String  // Will contain tap or cask info
+    var source: String  // Will contain tap or cask info
     var isSelected: Bool = false
 
     // To support Hashable

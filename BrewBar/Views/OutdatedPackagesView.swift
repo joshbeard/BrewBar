@@ -266,7 +266,7 @@ struct OutdatedPackagesView: View {
                                     .frame(width: 80, alignment: .leading)
                                 Text("Source")
                                     .fontWeight(.bold)
-                                    .frame(width: 80, alignment: .leading)
+                                    .frame(width: 120, alignment: .leading)
                                 Text("Actions")
                                     .fontWeight(.bold)
                                     .frame(width: 100, alignment: .center)
@@ -296,9 +296,10 @@ struct OutdatedPackagesView: View {
                                     Text(package.availableVersion)
                                         .foregroundColor(.blue)
                                         .frame(width: 80, alignment: .leading)
+                                    // Source column with a consistent display
                                     Text(package.source)
                                         .foregroundColor(.secondary)
-                                        .frame(width: 80, alignment: .leading)
+                                        .frame(width: 120, alignment: .leading)
                                     HStack(spacing: 10) {
                                         Button(action: {
                                             updateSinglePackage(package.name)
@@ -413,7 +414,7 @@ struct OutdatedPackagesView: View {
                                     .frame(width: 100, alignment: .leading)
                                 Text("Source")
                                     .fontWeight(.bold)
-                                    .frame(width: 80, alignment: .leading)
+                                    .frame(width: 120, alignment: .leading)
                                 Text("Actions")
                                     .fontWeight(.bold)
                                     .frame(width: 60, alignment: .center)
@@ -445,7 +446,7 @@ struct OutdatedPackagesView: View {
 
                                     Text(package.source)
                                         .foregroundColor(.secondary)
-                                        .frame(width: 80, alignment: .leading)
+                                        .frame(width: 120, alignment: .leading)
 
                                     Button(action: {
                                         uninstallPackage(package.name)

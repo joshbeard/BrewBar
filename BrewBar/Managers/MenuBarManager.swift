@@ -313,4 +313,29 @@ class MenuBarManager {
             }
         }
     }
+
+    // Rebuild the items in the check interval submenu
+    func rebuildIntervalSubmenuItems() {
+        guard let appDelegate = appDelegate,
+              let submenu = checkIntervalSubmenu else {
+            LoggingUtility.shared.log("Error: Could not rebuild interval submenu - delegate or submenu missing")
+            return
+        }
+
+        LoggingUtility.shared.log("Rebuilding interval submenu items")
+        submenu.removeAllItems()
+
+        // Add all interval options to the submenu
+        for (name, interval) in appDelegate.intervalOptions.sorted(by: { $0.value < $1.value }) {
+            let intervalItem = NSMenuItem(title: name, action: #selector(AppDelegate.setIntervalFromMenu(_:)), keyEquivalent: "")
+            intervalItem.target = appDelegate
+            intervalItem.representedObject = interval
+            // Mark the current interval
+            if interval == appDelegate.getCurrentInterval() {
+                intervalItem.state = .on
+            }
+            submenu.addItem(intervalItem)
+        }
+         LoggingUtility.shared.log("Finished rebuilding interval submenu with \(submenu.items.count) items")
+    }
 }
