@@ -2,6 +2,10 @@
 
 All notable changes to BrewBar will be documented in this file.
 
+## [0.0.6] - 2025-04-14
+
+- Removed `auto_update` from Cask - handle upgrades directly via Homebrew
+
 ## [0.0.5] - 2025-04-14
 
 ### Fixed
