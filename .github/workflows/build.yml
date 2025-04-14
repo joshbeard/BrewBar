@@ -1,0 +1,147 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write  # Needed for creating releases
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for tags and versioning
+
+    - name: Set up Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+
+    - name: Set up environment
+      run: |
+        # Set version based on the context
+        if [[ $GITHUB_REF == refs/tags/v* ]]; then
+          # Release from tag
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Setting version to $VERSION from tag"
+        else
+          # Development build (non-tag)
+          BRANCH=${GITHUB_REF#refs/heads/}
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="dev-${BRANCH}-${SHORT_SHA}"
+          echo "Setting development version to $VERSION"
+        fi
+
+        # Set environment variables and outputs
+        echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+      id: setup_env
+
+    - name: Build app and create distribution packages
+      run: |
+        # Build the app, create DMG, ZIP, and formula
+        make release
+      env:
+        VERSION: ${{ env.APP_VERSION }}
+
+    - name: Upload app (zip)
+      uses: actions/upload-artifact@v4
+      with:
+        name: BrewBar-zip
+        path: ./dist/BrewBar.zip
+
+    - name: Upload DMG
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: actions/upload-artifact@v4
+      with:
+        name: BrewBar-dmg
+        path: ./dist/BrewBar.dmg
+
+    - name: Upload Homebrew formula
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: actions/upload-artifact@v4
+      with:
+        name: homebrew-formula
+        path: ./dist/brewbar.rb
+
+    # Pass version to other jobs using workflow outputs
+    outputs:
+      version: ${{ steps.setup_env.outputs.VERSION }}
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for proper version detection
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+
+    - name: Prepare files for release
+      run: |
+        echo "Preparing files for release..."
+        # Create dist directory
+        mkdir -p dist
+
+        # Move artifacts to expected locations
+        cp ./artifacts/BrewBar-zip/BrewBar.zip ./BrewBar.zip
+        cp ./artifacts/BrewBar-dmg/BrewBar.dmg ./BrewBar.dmg
+        cp ./artifacts/homebrew-formula/brewbar.rb ./brewbar.rb
+
+        echo "Files ready for release:"
+        ls -la .
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          BrewBar.zip
+          BrewBar.dmg
+          brewbar.rb
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update Homebrew tap
+      env:
+        TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        VERSION: ${{ needs.build.outputs.version }}
+      run: |
+        if [ -z "$VERSION" ]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Using version from tag: $VERSION"
+        fi
+
+        # Make sure scripts are executable
+        chmod +x ./scripts/*.sh
+
+        # Show debugging info
+        echo "Files in current directory:"
+        ls -la
+
+        # Check if brewbar.rb exists
+        if [ ! -f "brewbar.rb" ]; then
+          echo "Error: brewbar.rb not found in current directory"
+          exit 1
+        fi
+
+        # Update the Homebrew tap
+        ./scripts/update_tap.sh "$VERSION" "brewbar.rb"
