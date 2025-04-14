@@ -59,6 +59,8 @@ cask "brewbar" do
   desc "A menubar app for managing Homebrew packages"
   homepage "https://github.com/${REPO}"
 
+  auto_updates true
+
   app "BrewBar.app"
 
   # Remove quarantine attribute
@@ -69,10 +71,28 @@ cask "brewbar" do
     nil
   end
 
+  # Restart app after update
+  postflight do
+    set_ownership "#{appdir}/BrewBar.app"
+
+    # Restart the app if it was running
+    if system "pgrep", "-x", "BrewBar"
+      system_command "pkill", args: ["-x", "BrewBar"]
+      sleep 1
+      system_command "open", args: ["#{appdir}/BrewBar.app"]
+    end
+  end
+
+  uninstall quit:      "me.joshbeard.BrewBar",
+            launchctl: "me.joshbeard.BrewBar",
+            delete:    "#{appdir}/BrewBar.app"
+
   zap trash: [
     "~/Library/Application Support/BrewBar",
     "~/Library/Preferences/me.joshbeard.BrewBar.plist",
     "~/Library/Caches/me.joshbeard.BrewBar",
+    "~/Library/Logs/BrewBar",
+    "~/Library/Saved Application State/me.joshbeard.BrewBar.savedState"
   ]
 end
 EOF
