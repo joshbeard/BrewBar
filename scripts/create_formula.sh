@@ -59,8 +59,6 @@ cask "brewbar" do
   desc "A menubar app for managing Homebrew packages"
   homepage "https://github.com/${REPO}"
 
-  auto_updates true
-
   app "BrewBar.app"
 
   # Remove quarantine attribute
