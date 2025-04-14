@@ -19,13 +19,13 @@ you define.
   <p><em>Main menu showing outdated packages</em></p>
 
   <img src=".github/readme/optimized/2.png" alt="Package details" width="400"/>
-  <p><em>Package information and update options</em></p>
+  <p><em>Package information and upgrade options</em></p>
 
   <img src=".github/readme/optimized/3.png" alt="Settings menu" width="400"/>
-  <p><em>Settings and preferences</em></p>
+  <p><em>Browse and uninstall installed packages</em></p>
 
   <img src=".github/readme/optimized/4.png" alt="Update notifications" width="400"/>
-  <p><em>Update notification example</em></p>
+  <p><em>Running an upgrade of all packages</em></p>
 </div>
 
 ## Installation
