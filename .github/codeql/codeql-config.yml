@@ -1,0 +1,12 @@
+name: Custom CodeQL Config
+
+paths:
+  - BrewBar
+
+paths-ignore:
+  - '**/Tests/**'
+  - '**/UITests/**'
+
+# Build override for Swift project
+buildCommand:
+  - xcodebuild clean build -project BrewBar.xcodeproj -scheme BrewBar -configuration Release -sdk macosx CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" EXPANDED_CODE_SIGN_IDENTITY="" -destination 'platform=macOS'
