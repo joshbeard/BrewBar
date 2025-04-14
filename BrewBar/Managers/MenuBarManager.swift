@@ -20,7 +20,7 @@ class MenuBarManager {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "shippingbox", accessibilityDescription: "Homebrew Status") // Initial icon
+            button.image = NSImage(systemSymbolName: "mug", accessibilityDescription: "Homebrew Status") // Initial icon
         }
 
         // Create the menu
@@ -259,7 +259,7 @@ class MenuBarManager {
                 }
             } else {
                 let count = outdatedPackages.count
-                self.statusItem?.button?.image = NSImage(systemSymbolName: "shippingbox.badge.clock", accessibilityDescription: "\(count) Updates Available") // Icon indicating updates
+                self.statusItem?.button?.image = NSImage(systemSymbolName: "mug.fill", accessibilityDescription: "\(count) Updates Available") // Icon indicating updates
 
                 // Truncate list for display
                 let maxDisplay = 3
