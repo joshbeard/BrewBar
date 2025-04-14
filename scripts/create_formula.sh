@@ -61,6 +61,13 @@ cask "brewbar" do
 
   app "BrewBar.app"
 
+  postflight do
+    set_ownership ["/Applications/BrewBar.app"]
+    system_command "/usr/bin/xattr",
+                  args: ["-cr", "/Applications/BrewBar.app"],
+                  sudo: false
+  end
+
   zap trash: [
     "~/Library/Application Support/BrewBar",
     "~/Library/Preferences/me.joshbeard.BrewBar.plist",
