@@ -2,6 +2,11 @@
 
 All notable changes to BrewBar will be documented in this file.
 
+## [0.0.5] - 2025-04-14
+
+### Fixed
+- Fixed deployment target compatibility by updating MACOSX_DEPLOYMENT_TARGET to 14.0 (Sonoma)
+
 ## [0.0.4] - 2025-04-13
 
 ### Improved
