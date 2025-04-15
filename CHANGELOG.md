@@ -2,6 +2,13 @@
 
 All notable changes to BrewBar will be documented in this file.
 
+## [0.0.8] - 2025-04-14
+
+### Changed
+- All user-initiated Homebrew commands now run in dedicated Terminal windows for better visibility and interaction
+- Automatic background update checks remain silent and non-interactive
+- Package lists (both installed and outdated) now automatically refresh after operations complete
+
 ## [0.0.7] - 2025-04-14
 
 - Test release

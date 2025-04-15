@@ -97,4 +97,77 @@ class BrewBarUtility {
             }
         }
     }
+
+    // Helper method to run brew commands in Terminal.app for interactive commands
+    func runInteractiveBrewCommand(_ args: [String]) {
+        guard let brewExec = brewPath else {
+            LoggingUtility.shared.log("ERROR: Brew executable not found")
+            return
+        }
+
+        // Create a temporary shell script to run our command
+        let tempDir = FileManager.default.temporaryDirectory
+        let scriptPath = tempDir.appendingPathComponent("brewbar-command.sh")
+
+        // Build the script content
+        let brewCommand = "\(brewExec) \(args.joined(separator: " "))"
+        let scriptContent = """
+        #!/bin/bash
+        set -e
+
+        # Function to clean up the temp script
+        cleanup() {
+            rm -f "\(scriptPath.path)"
+        }
+
+        # Set up trap to clean up on exit
+        trap cleanup EXIT
+
+        # Clear the screen and show header
+        clear
+        echo "=== BrewBar Command ==="
+        echo "Running: \(brewCommand)"
+        echo "===================="
+        echo
+
+        # Run the actual command and capture its exit status
+        set +e
+        \(brewCommand) 2>&1
+        STATUS=$?
+        set -e
+
+        echo
+        if [ $STATUS -eq 0 ]; then
+            echo "✅ Command completed successfully (exit code: $STATUS)"
+        else
+            echo "❌ Command failed (exit code: $STATUS)"
+        fi
+
+        echo
+        read -p "Press return to close this window..."
+
+        # Exit with the command's status
+        exit $STATUS
+        """
+
+        do {
+            // Write the script
+            try scriptContent.write(to: scriptPath, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptPath.path)
+
+            // Create the command to open Terminal and execute our script
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            task.arguments = [
+                "-a", "Terminal",
+                scriptPath.path
+            ]
+
+            LoggingUtility.shared.log("Running brew command in Terminal: \(brewCommand)")
+            try task.run()
+
+        } catch {
+            LoggingUtility.shared.log("Error setting up Terminal command: \(error.localizedDescription)")
+        }
+    }
 }

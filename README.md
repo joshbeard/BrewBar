@@ -4,6 +4,14 @@ A simple menu bar app for macOS that monitors your Homebrew packages for
 updates. It sits in your menu bar and checks for outdated packages on a schedule
 you define.
 
+> [!WARNING]
+> **Early Development**
+>
+> This is a 0.x.x release under very active development from a maintainer with
+> little Swift/SwiftUI experience.
+>
+> So be aware that it might not work and will have bugs.
+
 ## Features
 
 - 🔍 Check for outdated Homebrew packages on a customizable schedule
