@@ -399,14 +399,43 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menuBarManager.updateMenu(checking: true) // Update UI to show checking
         // ... (disable menu item) ...
         LoggingUtility.shared.log("Starting background check...")
-        guard let brewExecutable = BrewBarUtility.shared.brewPath else {
-            // ... (error handling) ...
-            DispatchQueue.main.async { completion?() }
+
+        guard BrewBarUtility.shared.brewPath != nil else {
+            LoggingUtility.shared.log("ERROR: Brew executable not found")
+            DispatchQueue.main.async {
+                self.lastCheckTime = Date()
+                self.menuBarManager.updateCheckNowMenuItemTitle()
+                self.updateMenuWithError()
+
+                if let showOutdatedItem = self.menuBarManager.menu?.item(withTitle: "View Packages...") {
+                    showOutdatedItem.isEnabled = true // Re-enable on error
+                }
+                completion?() // Call completion even on error
+            }
             return
         }
 
+        // Safely unwrap here since we guarded against nil above
+        let brewExecutable = BrewBarUtility.shared.brewPath!
+
         let task = Process()
-        // ... (setup task, args, environment, pipes) ...
+        task.executableURL = URL(fileURLWithPath: brewExecutable)
+        task.arguments = ["outdated", "--verbose"]
+
+        // Setup pipes for output and error
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        task.standardOutput = outputPipe
+        task.standardError = errorPipe
+
+        // Set environment variables to prevent interactive prompts from Homebrew
+        var environment = ProcessInfo.processInfo.environment
+        environment["HOMEBREW_NO_AUTO_UPDATE"] = "1"
+        environment["HOMEBREW_NO_INSTALL_UPGRADE"] = "1"
+        environment["HOMEBREW_NO_ANALYTICS"] = "1"
+        environment["HOMEBREW_NO_EMOJI"] = "1"
+        task.environment = environment
+
         BrewBarManager.shared.updateCheckTask = task
 
         do {
@@ -417,22 +446,41 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             LoggingUtility.shared.log("Started background command: \(commandString)")
 
             task.terminationHandler = { [weak self] process in
-                // ... (read pipe data) ...
+                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+
                 guard let self = self else {
                     DispatchQueue.main.async { completion?() }
                     return
                 }
 
                 DispatchQueue.main.async {
-                    // ... (process pipe data) ...
+                    let output = String(data: outputData, encoding: .utf8) ?? ""
+                    let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+
                     BrewBarManager.shared.updateCheckTask = nil
                     self.lastCheckTime = Date()
                     self.menuBarManager.updateCheckNowMenuItemTitle()
                     // ... (recalculate next check time and update specific menu item) ...
 
-                    var packages: [PackageInfo] = []
-                    var encounteredError = false
-                    // ... (parse output, handle termination status, update state) ...
+                    let packages: [PackageInfo]
+                    let encounteredError: Bool
+
+                    if process.terminationStatus == 0 {
+                        packages = BrewBarManager.shared.parsePackagesWithVersions(from: output)
+                        LoggingUtility.shared.log("Background check found \(packages.count) outdated packages")
+                        let currentCount = packages.count
+                        if currentCount > 0 && self.lastOutdatedCount == 0 { NotificationManager.shared.sendNotification(count: currentCount) }
+                        self.lastOutdatedCount = currentCount
+                        self.lastCheckError = false
+                        encounteredError = false // Assign within the if block
+                    } else {
+                        let logMessage = "Error in background check (status \(process.terminationStatus)): \(errorOutput.isEmpty ? output : errorOutput)"
+                        LoggingUtility.shared.log(logMessage)
+                        packages = [] // Assign empty array on error
+                        encounteredError = true // Assign within the else block
+                        self.lastCheckError = true
+                    }
 
                     BrewBarManager.shared.enrichOutdatedPackagesWithSource(packages: packages) { [weak self] enrichedPackages in
                         guard let self = self else {
