@@ -2,9 +2,21 @@ import Foundation
 import SwiftUI
 import Combine
 
+// Notification Name for triggering check from menu
+extension Notification.Name {
+    static let BrewBarShouldRunCheckInSheet = Notification.Name("me.joshbeard.brewbar.runCheckInSheet")
+    static let BrewBarShouldRunUpdateInSheet = Notification.Name("me.joshbeard.brewbar.runUpdateInSheet")
+    static let BrewBarShouldRunUpgradeAllInSheet = Notification.Name("me.joshbeard.brewbar.runUpgradeAllInSheet")
+}
+
 // State container for the view
 class PackageViewState: ObservableObject {
     @Published var isCheckingForUpdates: Bool = false
+    // Add state for the embedded terminal
+    @Published var showTerminalSheet: Bool = false
+    @Published var terminalArgs: [String]? = nil
+    @Published var terminalTitle: String = "Terminal"
+    @Published var terminalKey: UUID = UUID() // To force recreation
 }
 
 // MARK: - SwiftUI View for Homebrew Packages
@@ -16,59 +28,24 @@ struct OutdatedPackagesView: View {
     @State private var selectedTab = 0
     @State private var searchText = ""
     let errorOccurred: Bool
-    @ObservedObject var viewState: PackageViewState
+    @StateObject var viewState: PackageViewState // Changed to @StateObject as the view owns this state now
 
-    let updateSinglePackage: (String) -> Void
-    let updateSelectedPackages: ([String]) -> Void
-    let updateAllPackages: () -> Void
-    let uninstallPackage: (String) -> Void
-    let uninstallSelectedPackages: ([String]) -> Void
-    let checkNow: () -> Void
+    // Callbacks to trigger external actions
+    let refreshDataAfterTask: (_ commandArgs: [String], _ exitCode: Int32?) -> Void
 
-    // Computed properties for filtered package lists
-    private var filteredOutdatedPackages: [PackageInfo] {
-        if searchText.isEmpty {
-            return packagesInfo
-        } else {
-            return packagesInfo.filter {
-                $0.name.localizedCaseInsensitiveContains(searchText) ||
-                $0.source.localizedCaseInsensitiveContains(searchText)
-            }
-        }
-    }
-
-    private var filteredInstalledPackages: [InstalledPackageInfo] {
-        if searchText.isEmpty {
-            return installedPackages
-        } else {
-            return installedPackages.filter {
-                $0.name.localizedCaseInsensitiveContains(searchText) ||
-                $0.source.localizedCaseInsensitiveContains(searchText) ||
-                $0.version.localizedCaseInsensitiveContains(searchText)
-            }
-        }
-    }
+    // Get brew path (ideally passed in or from a shared utility)
+    private let brewExecutablePath = BrewBarUtility.shared.brewPath ?? "/opt/homebrew/bin/brew" // Fallback needed
 
     init(packages: [PackageInfo],
          installed: [InstalledPackageInfo],
          errorOccurred: Bool = false,
-         viewState: PackageViewState = PackageViewState(),
-         updateSinglePackage: @escaping (String) -> Void,
-         updateSelectedPackages: @escaping ([String]) -> Void,
-         updateAllPackages: @escaping () -> Void,
-         uninstallPackage: @escaping (String) -> Void,
-         uninstallSelectedPackages: @escaping ([String]) -> Void,
-         checkNow: @escaping () -> Void) {
+         viewState: PackageViewState, // Pass the initial state
+         refreshDataAfterTask: @escaping (_ commandArgs: [String], _ exitCode: Int32?) -> Void) {
         self.packagesInfo = packages
         self.installedPackages = installed
         self.errorOccurred = errorOccurred
-        self.viewState = viewState
-        self.updateSinglePackage = updateSinglePackage
-        self.updateSelectedPackages = updateSelectedPackages
-        self.updateAllPackages = updateAllPackages
-        self.uninstallPackage = uninstallPackage
-        self.uninstallSelectedPackages = uninstallSelectedPackages
-        self.checkNow = checkNow
+        _viewState = StateObject(wrappedValue: viewState)
+        self.refreshDataAfterTask = refreshDataAfterTask
     }
 
     var body: some View {
@@ -85,7 +62,6 @@ struct OutdatedPackagesView: View {
 
                 Button("Check Again") {
                     viewState.isCheckingForUpdates = true
-                    checkNow()
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(viewState.isCheckingForUpdates)
@@ -152,6 +128,68 @@ struct OutdatedPackagesView: View {
         }
         .padding()
         .frame(minWidth: 650, minHeight: 350) // Ensure minimum size even when there's an error
+        .sheet(isPresented: $viewState.showTerminalSheet) {
+            // Sheet content: The Terminal View
+            if let args = viewState.terminalArgs {
+                VStack {
+                    Text(viewState.terminalTitle)
+                        .font(.headline)
+                        .padding(.top)
+
+                    SwiftTermView(executablePath: brewExecutablePath,
+                                  arguments: args,
+                                  onProcessEnd: { commandArgs, exitCode in
+                                      // Trigger data refresh after task completion
+                                      self.refreshDataAfterTask(commandArgs, exitCode)
+                                  })
+                        .id(viewState.terminalKey) // Force recreation when key changes
+                        .frame(minWidth: 600, minHeight: 400) // Size for the sheet
+
+                    Button("Close") {
+                        viewState.showTerminalSheet = false
+                    }
+                    .padding()
+                }
+            } else {
+                // Fallback content if args aren't set (shouldn't happen with current logic)
+                Text("Error: No command specified for terminal.")
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .BrewBarShouldRunCheckInSheet)) { _ in
+            handleRunCheckInSheet()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .BrewBarShouldRunUpdateInSheet)) { _ in
+            handleRunUpdateInSheet()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .BrewBarShouldRunUpgradeAllInSheet)) { _ in
+            handleRunUpgradeAllInSheet()
+        }
+    }
+
+    private func handleRunCheckInSheet() {
+        LoggingUtility.shared.log("Received notification to run check in sheet.")
+        viewState.terminalArgs = ["outdated", "--verbose"]
+        viewState.terminalTitle = "Checking for Outdated Packages..."
+        viewState.terminalKey = UUID()
+        viewState.showTerminalSheet = true
+    }
+
+    private func handleRunUpdateInSheet() {
+        LoggingUtility.shared.log("Received notification to run update in sheet.")
+        let command = BrewBarManager.shared.updateCommand // Use configured command
+        viewState.terminalArgs = command
+        viewState.terminalTitle = "Updating Homebrew..."
+        viewState.terminalKey = UUID()
+        viewState.showTerminalSheet = true
+    }
+
+    private func handleRunUpgradeAllInSheet() {
+        LoggingUtility.shared.log("Received notification to run upgrade all in sheet.")
+        let command = BrewBarManager.shared.upgradeCommand // Use configured command
+        viewState.terminalArgs = command
+        viewState.terminalTitle = "Upgrading All Packages..."
+        viewState.terminalKey = UUID()
+        viewState.showTerminalSheet = true
     }
 
     @ViewBuilder
@@ -172,8 +210,10 @@ struct OutdatedPackagesView: View {
                         .foregroundColor(.secondary)
 
                     Button("Check for Updates") {
-                        viewState.isCheckingForUpdates = true
-                        checkNow()
+                        viewState.terminalArgs = ["outdated", "--verbose"]
+                        viewState.terminalTitle = "Checking for Outdated Packages..."
+                        viewState.terminalKey = UUID()
+                        viewState.showTerminalSheet = true
                     }
                     .padding(.top, 10)
                     .disabled(viewState.isCheckingForUpdates)
@@ -227,21 +267,30 @@ struct OutdatedPackagesView: View {
                         Spacer()
 
                         Button("Check for Updates") {
-                            viewState.isCheckingForUpdates = true
-                            checkNow()
+                            viewState.terminalArgs = ["outdated", "--verbose"]
+                            viewState.terminalTitle = "Checking for Outdated Packages..."
+                            viewState.terminalKey = UUID()
+                            viewState.showTerminalSheet = true
                         }
                         .disabled(viewState.isCheckingForUpdates)
 
                         Button("Upgrade Selected") {
                             let packageNames = Array(selectedPackages)
                             if !packageNames.isEmpty {
-                                updateSelectedPackages(packageNames)
+                                viewState.terminalArgs = ["upgrade"] + packageNames
+                                viewState.terminalTitle = "Upgrading Selected..."
+                                viewState.terminalKey = UUID()
+                                viewState.showTerminalSheet = true
                             }
                         }
                         .disabled(selectedPackages.isEmpty || viewState.isCheckingForUpdates)
 
                         Button("Upgrade All") {
-                            updateAllPackages()
+                            let command = BrewBarManager.shared.upgradeCommand
+                            viewState.terminalArgs = command
+                            viewState.terminalTitle = "Upgrading All Packages..."
+                            viewState.terminalKey = UUID()
+                            viewState.showTerminalSheet = true
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(viewState.isCheckingForUpdates)
@@ -302,7 +351,10 @@ struct OutdatedPackagesView: View {
                                         .frame(width: 120, alignment: .leading)
                                     HStack(spacing: 10) {
                                         Button(action: {
-                                            updateSinglePackage(package.name)
+                                            viewState.terminalArgs = ["upgrade", package.name]
+                                            viewState.terminalTitle = "Upgrading \(package.name)..."
+                                            viewState.terminalKey = UUID()
+                                            viewState.showTerminalSheet = true
                                         }) {
                                             Image(systemName: "arrow.up.circle")
                                                 .foregroundColor(.blue)
@@ -311,7 +363,14 @@ struct OutdatedPackagesView: View {
                                         .help("Upgrade \(package.name)")
 
                                         Button(action: {
-                                            uninstallPackage(package.name)
+                                            let isCask = package.source == "cask"
+                                            var args = ["uninstall"]
+                                            if isCask { args.append("--cask") }
+                                            args.append(package.name)
+                                            viewState.terminalArgs = args
+                                            viewState.terminalTitle = "Uninstalling \(package.name)..."
+                                            viewState.terminalKey = UUID()
+                                            viewState.showTerminalSheet = true
                                         }) {
                                             Image(systemName: "trash")
                                                 .foregroundColor(.red)
@@ -391,7 +450,16 @@ struct OutdatedPackagesView: View {
 
                         Button("Uninstall Selected") {
                             if !selectedInstalledPackages.isEmpty {
-                                uninstallSelectedPackages(Array(selectedInstalledPackages))
+                                if let firstPackageName = selectedInstalledPackages.first {
+                                    let isCask = installedPackages.first { $0.name == firstPackageName }?.source == "cask"
+                                    var args = ["uninstall"]
+                                    if isCask { args.append("--cask") }
+                                    args.append(firstPackageName)
+                                    viewState.terminalArgs = args
+                                    viewState.terminalTitle = "Uninstalling \(firstPackageName)..."
+                                    viewState.terminalKey = UUID()
+                                    viewState.showTerminalSheet = true
+                                }
                             }
                         }
                         .disabled(selectedInstalledPackages.isEmpty)
@@ -449,7 +517,14 @@ struct OutdatedPackagesView: View {
                                         .frame(width: 120, alignment: .leading)
 
                                     Button(action: {
-                                        uninstallPackage(package.name)
+                                        let isCask = package.source == "cask"
+                                        var args = ["uninstall"]
+                                        if isCask { args.append("--cask") }
+                                        args.append(package.name)
+                                        viewState.terminalArgs = args
+                                        viewState.terminalTitle = "Uninstalling \(package.name)..."
+                                        viewState.terminalKey = UUID()
+                                        viewState.showTerminalSheet = true
                                     }) {
                                         Image(systemName: "trash")
                                             .foregroundColor(.red)
@@ -466,6 +541,30 @@ struct OutdatedPackagesView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
+            }
+        }
+    }
+
+    // Computed properties for filtered package lists
+    private var filteredOutdatedPackages: [PackageInfo] {
+        if searchText.isEmpty {
+            return packagesInfo
+        } else {
+            return packagesInfo.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText) ||
+                $0.source.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+    }
+
+    private var filteredInstalledPackages: [InstalledPackageInfo] {
+        if searchText.isEmpty {
+            return installedPackages
+        } else {
+            return installedPackages.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText) ||
+                $0.source.localizedCaseInsensitiveContains(searchText) ||
+                $0.version.localizedCaseInsensitiveContains(searchText)
             }
         }
     }

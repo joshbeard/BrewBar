@@ -19,6 +19,8 @@ you define.
 - 🖱️ Selective package updates - choose which packages to upgrade
 - 🚀 One-click updates for individual packages or all at once
 - ⚙️ Customizable update intervals, including user-defined schedules
+- 📋 Browse and remove installed packages
+- 💻 Embedded terminal emulator using [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)
 
 ## Screenshots
 

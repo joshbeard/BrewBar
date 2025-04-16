@@ -81,7 +81,7 @@ class MenuBarManager {
         menu?.addItem(checkIntervalItem)
 
         // Update and upgrade menu items
-        let updateItem = NSMenuItem(title: "Update Homebrew Database", action: #selector(AppDelegate.runUpdate), keyEquivalent: "u")
+        let updateItem = NSMenuItem(title: "Update Homebrew", action: #selector(AppDelegate.runUpdate), keyEquivalent: "u")
         updateItem.target = appDelegate
         menu?.addItem(updateItem)
 

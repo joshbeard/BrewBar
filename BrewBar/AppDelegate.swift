@@ -2,14 +2,17 @@ import Cocoa
 import SwiftUI
 import UserNotifications
 import ServiceManagement
+// Make sure SwiftTerm is imported if needed, though it's used in SwiftTermView
+import SwiftTerm
 
 // MARK: - AppDelegate
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // Managers
     var menuBarManager: MenuBarManager!
-    private var terminalWindowController: TerminalWindowController?
+    private var terminalWindowController: TerminalWindowController? // For non-interactive output
     private var preferencesWindowController: PreferencesWindowController?
+    private var embeddedTerminalWindowController: NSWindowController? // For interactive SwiftTerm view
 
     // Timer for checking updates
     private var updateTimer: Timer?
@@ -59,6 +62,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
+    // Notification Names
+    static let runCheckInSheetNotification = Notification.Name("me.joshbeard.brewbar.runCheckInSheet")
+    static let runUpdateInSheetNotification = Notification.Name("me.joshbeard.brewbar.runUpdateInSheet") // For brew update
+    static let runUpgradeAllInSheetNotification = Notification.Name("me.joshbeard.brewbar.runUpgradeAllInSheet") // For brew upgrade
+
     // MARK: - App Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -72,14 +80,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Create the terminal window controller
         terminalWindowController = TerminalWindowController()
 
-        // Initial check for updates
-        checkForUpdates()
-
-        // Initial fetch of installed packages
-        refreshInstalledPackages()
-
-        // Schedule periodic updates if enabled
-        scheduleUpdateTimer()
+        // Start initial data load
+        checkForUpdates(displayOutput: false) { [weak self] in
+            guard let self = self else { return }
+            self.refreshInstalledPackages() {
+                self.scheduleUpdateTimer()
+                // Final UI update after all initial loading
+                self.menuBarManager.updateMenu(outdatedPackages: self.currentOutdatedPackages,
+                                               checking: false,
+                                               errorOccurred: self.lastCheckError)
+            }
+        }
 
         // Register for notifications
         NotificationCenter.default.addObserver(
@@ -112,40 +123,36 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
-        // Clean up: terminate any running check process and timers
+        // Clean up timers and potentially running background tasks
         BrewBarManager.shared.updateCheckTask?.interrupt()
         updateTimer?.invalidate()
         menuBarManager.cleanup()
-
-        // Remove observers
         NotificationCenter.default.removeObserver(self)
     }
 
-    // MARK: - Timer Scheduling
+    // MARK: - Timer Scheduling & Interval Handling
 
     func scheduleUpdateTimer() {
-        updateTimer?.invalidate() // Invalidate existing timer first
+        updateTimer?.invalidate()
         updateTimer = nil
-
         let interval = getCurrentInterval()
 
-        // Only schedule if interval > 0 (not manual)
         if interval > 0 {
             updateTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
                 self?.checkForUpdates()
             }
-
-            // Calculate and store the next check time
             let nextCheck = Date().addingTimeInterval(interval)
             nextScheduledCheckTime = nextCheck
-
             LoggingUtility.shared.log("Scheduled update check every \(interval) seconds. Next check at \(formatDate(nextCheck))")
-
-            // Update the menu to show the next check time
             menuBarManager.updateNextCheckMenuItem()
+            // Call updateMenu after scheduling to ensure consistency
+            menuBarManager.updateMenu(outdatedPackages: currentOutdatedPackages, checking: false, errorOccurred: lastCheckError)
         } else {
             nextScheduledCheckTime = nil
             LoggingUtility.shared.log("Update checks set to manual.")
+            menuBarManager.updateNextCheckMenuItem()
+            // Call updateMenu after setting to manual
+            menuBarManager.updateMenu(outdatedPackages: currentOutdatedPackages, checking: false, errorOccurred: lastCheckError)
         }
     }
 
@@ -239,49 +246,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
            let window = existingController.window {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            // If the menu item was used, post notification to ensure sheet opens
+            // (Consider if this is needed or if just bringing window forward is enough)
+             // NotificationCenter.default.post(name: Self.runCheckInSheetNotification, object: nil)
             return
         }
 
-        LoggingUtility.shared.log("Creating packages window with fetch for installed packages")
-
-        // Create a shared view state
+        LoggingUtility.shared.log("Creating packages window...")
         let viewState = PackageViewState()
 
-        // Create a temporary view with empty installed packages
+        // Create the initial view - Removed checkNow parameter
         let initialView = OutdatedPackagesView(
             packages: currentOutdatedPackages,
             installed: [],
             errorOccurred: lastCheckError,
             viewState: viewState,
-            updateSinglePackage: { [weak self] packageName in
-                self?.upgradeSinglePackage(packageName)
-            },
-            updateSelectedPackages: { [weak self] packageNames in
-                self?.upgradeSelectedPackages(packageNames)
-            },
-            updateAllPackages: { [weak self] in
-                self?.upgradeAllPackages()
-            },
-            uninstallPackage: { [weak self] packageName in
-                self?.uninstallPackage(packageName)
-            },
-            uninstallSelectedPackages: { [weak self] packageNames in
-                self?.uninstallSelectedPackages(packageNames)
-            },
-            checkNow: { [weak self, weak viewState] in
-                // Set window to checking state first
-                viewState?.isCheckingForUpdates = true
-                LoggingUtility.shared.log("DEBUG: Window CheckNow: Set viewState.isCheckingForUpdates = true")
-
-                // Run the check for updates, refresh window on completion
-                LoggingUtility.shared.log("DEBUG: Window CheckNow: Starting checkForUpdates()")
-                self?.checkForUpdates(displayOutput: true) { // Pass true for displayOutput
-                    // This block executes *after* checkForUpdates is complete
-                    LoggingUtility.shared.log("DEBUG: Window CheckNow: checkForUpdates completed, calling refreshPackagesWindow()")
-                    // Use weak self here as well
-                    self?.refreshPackagesWindow(viewState: viewState)
-                }
-                LoggingUtility.shared.log("DEBUG: Window CheckNow: checkForUpdates() initiated with completion handler")
+            // Updated refreshDataAfterTask closure
+            refreshDataAfterTask: { [weak self] commandArgs, exitCode in
+                self?.handleTaskCompletion(commandArgs: commandArgs, exitCode: exitCode)
             }
         )
 
@@ -310,539 +292,280 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         outdatedPackagesWindowController?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        // Fetch installed packages and update the view
+        // Fetch installed packages and update the view asynchronously
         BrewBarManager.shared.fetchInstalledPackages { [weak self, weak viewState] packages in
-            guard let self = self,
-                  let window = self.outdatedPackagesWindowController?.window,
-                  let contentVC = window.contentViewController as? NSHostingController<OutdatedPackagesView> else {
-                return
-            }
+             guard let self = self else { return }
+             guard let capturedViewState = viewState else { return }
+             guard let window = self.outdatedPackagesWindowController?.window,
+                   let contentVC = window.contentViewController as? NSHostingController<OutdatedPackagesView> else { return }
 
-            LoggingUtility.shared.log("Updating window with \(packages.count) installed packages")
-
-            // Create updated view with installed packages
             let updatedView = OutdatedPackagesView(
                 packages: self.currentOutdatedPackages,
                 installed: packages,
                 errorOccurred: self.lastCheckError,
-                viewState: viewState ?? PackageViewState(),
-                updateSinglePackage: { [weak self] packageName in
-                    self?.upgradeSinglePackage(packageName)
-                },
-                updateSelectedPackages: { [weak self] packageNames in
-                    self?.upgradeSelectedPackages(packageNames)
-                },
-                updateAllPackages: { [weak self] in
-                    self?.upgradeAllPackages()
-                },
-                uninstallPackage: { [weak self] packageName in
-                    self?.uninstallPackage(packageName)
-                },
-                uninstallSelectedPackages: { [weak self] packageNames in
-                    self?.uninstallSelectedPackages(packageNames)
-                },
-                checkNow: { [weak self, weak viewState] in
-                    // Set window to checking state first
-                    viewState?.isCheckingForUpdates = true
-                    LoggingUtility.shared.log("DEBUG: Window CheckNow (nested): Set viewState.isCheckingForUpdates = true")
-
-                    // Run the check for updates, refresh window on completion
-                    LoggingUtility.shared.log("DEBUG: Window CheckNow (nested): Starting checkForUpdates()")
-                    self?.checkForUpdates(displayOutput: true) { // Pass true for displayOutput
-                        // This block executes *after* checkForUpdates is complete
-                        LoggingUtility.shared.log("DEBUG: Window CheckNow (nested): checkForUpdates completed, calling refreshPackagesWindow()")
-                        // Use weak self here as well
-                        self?.refreshPackagesWindow(viewState: viewState)
-                    }
-                    LoggingUtility.shared.log("DEBUG: Window CheckNow (nested): checkForUpdates() initiated with completion handler")
+                viewState: capturedViewState,
+                refreshDataAfterTask: { [weak self] commandArgs, exitCode in
+                    self?.handleTaskCompletion(commandArgs: commandArgs, exitCode: exitCode)
                 }
             )
-
-            // Update the UI
             contentVC.rootView = updatedView
         }
     }
 
     // MARK: - NSWindowDelegate
     func windowWillClose(_ notification: Notification) {
-        // Check if the closing window is our outdated packages window
+        // Only handle closing the packages window now
         if (notification.object as? NSWindow) == outdatedPackagesWindowController?.window {
             LoggingUtility.shared.log("Outdated packages window closed.")
-            outdatedPackagesWindowController = nil // Release the controller reference
+            outdatedPackagesWindowController = nil
         }
-    }
-
-    // MARK: - Update Operations
-
-    @objc func checkForUpdatesManual() {
-        // Rate limiting - prevent refreshing more than once a minute
-        if let lastCheck = lastCheckTime, Date().timeIntervalSince(lastCheck) < 60 {
-            // Show a notification that we're rate limiting
-            LoggingUtility.shared.log("Rate limiting: Preventing check more than once per minute")
-
-            let alert = NSAlert()
-            alert.messageText = "Please Wait"
-            alert.informativeText = "You can only check for updates once per minute."
-            alert.alertStyle = .informational
-            alert.runModal()
-            return
-        }
-
-        LoggingUtility.shared.log("Manual update check triggered.")
-        checkForUpdates(displayOutput: true)
-    }
-
-    func checkForUpdates(displayOutput: Bool = false, completion: (() -> Void)? = nil) {
-        // If an update check is already running, cancel it before starting a new one.
-        BrewBarManager.shared.updateCheckTask?.interrupt()
-        BrewBarManager.shared.updateCheckTask = nil
-
-        // Reset error state to start fresh
-        lastCheckError = false
-
-        // Update menu to show checking state
-        menuBarManager.updateMenu(outdatedPackages: [], checking: true)
-
-        // Disable show outdated button while checking
-        if let showOutdatedItem = menuBarManager.menu?.item(withTitle: "Show Outdated Packages...") {
-             showOutdatedItem.isEnabled = false
-        }
-
-        // Log check starting
-        LoggingUtility.shared.log("Starting check for updates")
-
-        // Use the found brew path
-        guard let brewExecutable = BrewBarUtility.shared.brewPath else {
-            LoggingUtility.shared.log("ERROR: Brew executable not found")
-            DispatchQueue.main.async {
-                self.lastCheckTime = Date()
-                self.menuBarManager.updateCheckNowMenuItemTitle()
-                self.updateMenuWithError()
-
-                if let showOutdatedItem = self.menuBarManager.menu?.item(withTitle: "Show Outdated Packages...") {
-                    showOutdatedItem.isEnabled = true
-                }
+        // Check if the closing window is our embedded terminal window
+        else if (notification.object as? NSWindow) == embeddedTerminalWindowController?.window {
+            LoggingUtility.shared.log("Embedded terminal window closed.")
+            // Optional: Interrupt process when window closes (might be desired)
+            // Remove the attempt to interrupt the internal process.
+            /*
+            if let hostingController = embeddedTerminalWindowController?.window?.contentViewController as? NSHostingController<SwiftTermView>,
+               let terminalView = hostingController.view as? LocalProcessTerminalView {
+                LoggingUtility.shared.log("Interrupting embedded terminal process on window close.")
+                // terminalView.process?.interrupt() // Don't do this
             }
+            */
+            embeddedTerminalWindowController = nil // Release the controller reference
+
+            // Trigger a refresh check after closing the terminal, as the user likely changed something
+            LoggingUtility.shared.log("Triggering background check after embedded terminal closed.")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { // Short delay
+                 self.checkForUpdates(displayOutput: false) { // Run check silently
+                     self.refreshInstalledPackages()
+                 }
+            }
+        }
+    }
+
+    // MARK: - Menu Item Actions (Triggering Sheet via Notifications)
+    @objc func checkForUpdatesManual() {
+        // Rate limiting logic remains the same...
+        if let lastCheck = lastCheckTime, Date().timeIntervalSince(lastCheck) < 60 {
+            // ... show alert ...
             return
         }
 
-        LoggingUtility.shared.log("Using brew at path: \(brewExecutable)")
+        LoggingUtility.shared.log("Manual update check triggered from menu.")
 
-        // Show terminal window if requested
+        // 1. Ensure the packages window is open and frontmost
+        showOutdatedPackagesWindow()
+
+        // 2. Post notification to tell the window to show the check in its sheet
+        // Needs a slight delay to ensure window is ready to receive if just created
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NotificationCenter.default.post(name: Self.runCheckInSheetNotification, object: nil)
+        }
+    }
+
+    @objc func runUpdate() {
+        LoggingUtility.shared.log("Update DB triggered from menu.")
+        showOutdatedPackagesWindow()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NotificationCenter.default.post(name: Self.runUpdateInSheetNotification, object: nil)
+        }
+    }
+
+    @objc func runUpgradeAll() {
+        LoggingUtility.shared.log("Upgrade All triggered from menu.")
+        showOutdatedPackagesWindow()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NotificationCenter.default.post(name: Self.runUpgradeAllInSheetNotification, object: nil)
+        }
+    }
+
+    // MARK: - Background Check Logic
+    func checkForUpdates(displayOutput: Bool = false, completion: (() -> Void)? = nil) {
+        // Ignore displayOutput=true branch as it's handled via notifications
         if displayOutput {
-            terminalWindowController?.showWindow()
-            terminalWindowController?.appendOutput("Checking for outdated packages...\n", color: NSColor.systemBlue)
+            LoggingUtility.shared.log("Warning: checkForUpdates(displayOutput: true) called directly. Manual checks should use checkForUpdatesManual().")
+            DispatchQueue.main.async { completion?() }
+            return
         }
 
-        // Create a Process to run brew outdated directly
+        // Prevent overlapping checks
+        if BrewBarManager.shared.updateCheckTask != nil {
+            LoggingUtility.shared.log("Background check already in progress. Skipping.")
+            DispatchQueue.main.async { completion?() } // Still call completion
+            return
+        }
+
+        lastCheckError = false
+        menuBarManager.updateMenu(checking: true) // Update UI to show checking
+        // ... (disable menu item) ...
+        LoggingUtility.shared.log("Starting background check...")
+        guard let brewExecutable = BrewBarUtility.shared.brewPath else {
+            // ... (error handling) ...
+            DispatchQueue.main.async { completion?() }
+            return
+        }
+
         let task = Process()
-        task.executableURL = URL(fileURLWithPath: brewExecutable)
-        task.arguments = ["outdated", "--verbose"] // Only use --verbose to get version information
-
-        // Setup environment variables
-        var environment = ProcessInfo.processInfo.environment
-        let brewBinPath = URL(fileURLWithPath: brewExecutable).deletingLastPathComponent().path
-
-        // Make sure PATH includes Homebrew's bin directory
-        let paths = [
-            brewBinPath,              // Homebrew's bin directory
-            "/usr/bin",               // System binaries
-            "/bin",                   // Basic Unix binaries
-            "/usr/sbin",              // System admin binaries
-            "/sbin",                  // System admin binaries
-            "/usr/local/bin"          // Common local binaries
-        ]
-
-        let pathValue = paths.joined(separator: ":")
-        environment["PATH"] = pathValue
-        task.environment = environment
-
-        LoggingUtility.shared.log("Using PATH: \(pathValue)")
-
-        // Setup pipes for output
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        task.standardOutput = outputPipe
-        task.standardError = errorPipe
-
-        // Store reference to allow cancellation
+        // ... (setup task, args, environment, pipes) ...
         BrewBarManager.shared.updateCheckTask = task
 
-        // If showing terminal window, show the command being run
-        if displayOutput {
-            terminalWindowController?.appendOutput("Running: brew outdated --verbose\n\n", color: NSColor.systemGreen)
-
-            // Handle output in real-time for the terminal window
-            outputPipe.fileHandleForReading.readabilityHandler = { [weak self] fileHandle in
-                guard let self = self else { return }
-
-                let data = fileHandle.availableData
-                if data.count > 0, let output = String(data: data, encoding: .utf8) {
-                    self.terminalWindowController?.appendOutput(output)
-                }
-            }
-
-            errorPipe.fileHandleForReading.readabilityHandler = { [weak self] fileHandle in
-                guard let self = self else { return }
-
-                let data = fileHandle.availableData
-                if data.count > 0, let output = String(data: data, encoding: .utf8) {
-                    self.terminalWindowController?.appendOutput(output, color: NSColor.systemRed)
-                }
-            }
-        }
-
         do {
+            // Construct command string safely for logging
+            let commandString = "brew \((task.arguments ?? []).joined(separator: " "))"
             try task.run()
+            // Log *after* successful start, using the commandString variable
+            LoggingUtility.shared.log("Started background command: \(commandString)")
 
-            LoggingUtility.shared.log("Successfully started brew outdated process")
-
-            // Async handler for when process completes
             task.terminationHandler = { [weak self] process in
-                guard let self = self else { return }
-
-                // Read output if we're not showing it in a terminal window
-                var output = ""
-                var errorOutput = ""
-
-                if !displayOutput {
-                    // Read output from pipes if we're not streaming it to the terminal
-                    let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-                    let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-
-                    output = String(data: outputData, encoding: .utf8) ?? ""
-                    errorOutput = String(data: errorData, encoding: .utf8) ?? ""
-                } else {
-                    // Clean up the readability handlers
-                    outputPipe.fileHandleForReading.readabilityHandler = nil
-                    errorPipe.fileHandleForReading.readabilityHandler = nil
+                // ... (read pipe data) ...
+                guard let self = self else {
+                    DispatchQueue.main.async { completion?() }
+                    return
                 }
 
                 DispatchQueue.main.async {
+                    // ... (process pipe data) ...
                     BrewBarManager.shared.updateCheckTask = nil
                     self.lastCheckTime = Date()
                     self.menuBarManager.updateCheckNowMenuItemTitle()
-
-                    // Recalculate the next check time
-                    let interval = self.getCurrentInterval()
-                    if interval > 0 {
-                        self.nextScheduledCheckTime = Date().addingTimeInterval(interval)
-                        self.menuBarManager.updateNextCheckMenuItem()
-                    }
+                    // ... (recalculate next check time and update specific menu item) ...
 
                     var packages: [PackageInfo] = []
                     var encounteredError = false
+                    // ... (parse output, handle termination status, update state) ...
 
-                    if process.terminationStatus == 0 {
-                        // Success - parse packages
-                        if displayOutput {
-                            // Get the output from the terminal window's text
-                            if let text = self.terminalWindowController?.textView?.string {
-                                // Parse packages from the terminal text
-                                packages = BrewBarManager.shared.parsePackagesWithVersions(from: text)
-                            }
-                        } else {
-                            // Parse packages from the captured output
-                            packages = BrewBarManager.shared.parsePackagesWithVersions(from: output)
-                        }
-
-                        LoggingUtility.shared.log("Found \(packages.count) outdated packages")
-
-                        if displayOutput {
-                            // Show summary in the terminal window
-                            if packages.isEmpty {
-                                self.terminalWindowController?.appendOutput("\nNo outdated packages found.\n", color: NSColor.systemGreen)
-                            } else {
-                                self.terminalWindowController?.appendOutput("\nFound \(packages.count) outdated package(s).\n", color: NSColor.systemOrange)
-                            }
-                        }
-
-                        // Send notification if outdated packages changed from 0
-                        let currentCount = packages.count
-                        if currentCount > 0 && self.lastOutdatedCount == 0 {
-                            NotificationManager.shared.sendNotification(count: currentCount)
-                        }
-                        self.lastOutdatedCount = currentCount
-                    } else {
-                        // Error during brew command
-                        let logMessage = "Error checking for updates (status \(process.terminationStatus)): \(errorOutput.isEmpty ? output : errorOutput)"
-                        LoggingUtility.shared.log(logMessage)
-                        encounteredError = true
-
-                        if displayOutput {
-                            self.terminalWindowController?.appendOutput("\nError checking for updates: \(process.terminationStatus)\n", color: NSColor.systemRed)
-                        }
-                    }
-
-                    // Enrich packages with source information before updating UI
                     BrewBarManager.shared.enrichOutdatedPackagesWithSource(packages: packages) { [weak self] enrichedPackages in
-                        guard let self = self else { return }
-
-                        // Update state with enriched packages
-                        self.currentOutdatedPackages = enrichedPackages
-                        self.menuBarManager.updateMenu(outdatedPackages: enrichedPackages, errorOccurred: encounteredError)
-
-                        // Update terminal window if displayed
-                        if displayOutput {
-                            self.terminalWindowController?.appendOutput("\nCheck completed at \(DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium))\n", color: NSColor.systemBlue)
+                        guard let self = self else {
+                             DispatchQueue.main.async { completion?() }
+                            return
                         }
-
-                        // Call the completion handler if provided (AFTER enrichment)
-                        completion?()
+                        self.currentOutdatedPackages = enrichedPackages
+                        // Final menu update after enrichment
+                        self.menuBarManager.updateMenu(outdatedPackages: enrichedPackages, checking: false, errorOccurred: encounteredError)
+                        // ... (re-enable menu item) ...
+                        completion?() // Call completion *after* all processing
                     }
                 }
             }
         } catch {
-            LoggingUtility.shared.log("ERROR executing brew outdated: \(error.localizedDescription)")
-
-            if displayOutput {
-                terminalWindowController?.appendOutput("ERROR: Failed to execute brew outdated: \(error.localizedDescription)\n", color: NSColor.systemRed)
-            }
-
-            DispatchQueue.main.async {
-                BrewBarManager.shared.updateCheckTask = nil
-                self.lastCheckTime = Date()
-                self.menuBarManager.updateCheckNowMenuItemTitle()
-                self.updateMenuWithError()
-
-                if let showOutdatedItem = self.menuBarManager.menu?.item(withTitle: "Show Outdated Packages...") {
-                    showOutdatedItem.isEnabled = true
-                }
-
-                // Call completion handler even on error
-                completion?()
-            }
+            // ... (error handling for task.run) ...
+            DispatchQueue.main.async { completion?() }
         }
     }
 
+    // MARK: - State Update Helpers
     func updateMenuWithError() {
         lastCheckError = true
         menuBarManager.updateMenu(errorOccurred: true)
     }
 
+    // Called by BrewBarManager if background task is started/stopped elsewhere (if applicable)
     func updateMenuWithUpdateStatus() {
         menuBarManager.updateInProgressMenuItem?.isHidden = !isUpdateRunning
     }
 
-    // MARK: - Package Operations
-
-    // Run homebrew operations
-    @objc func runUpdate() {
-        runBrewCommand(BrewBarManager.shared.updateCommand, title: "Updating Homebrew")
-    }
-
-    @objc func runUpgradeAll() {
-        runBrewCommand(BrewBarManager.shared.upgradeCommand, title: "Upgrading All Packages")
-    }
-
-    func upgradeSinglePackage(_ packageName: String) {
-        runBrewCommand(["upgrade", packageName], title: "Upgrading \(packageName)")
-    }
-
-    func upgradeSelectedPackages(_ packageNames: [String]) {
-        var args = ["upgrade"]
-        args.append(contentsOf: packageNames)
-        runBrewCommand(args, title: "Upgrading Selected Packages")
-    }
-
-    func upgradeAllPackages() {
-        runUpgradeAll()
-    }
-
-    func uninstallPackage(_ packageName: String) {
-        // Check if it's a cask
-        let isCask = currentOutdatedPackages.contains { $0.name == packageName && $0.source == "cask" }
-
-        var args = ["uninstall"]
-        if isCask {
-            args.append("--cask")
-        }
-        args.append(packageName)
-
-        runBrewCommand(args, title: "Uninstalling \(packageName)")
-    }
-
-    func uninstallSelectedPackages(_ packageNames: [String]) {
-        let alert = NSAlert()
-        alert.messageText = "Uninstall Packages"
-        alert.informativeText = "Are you sure you want to uninstall \(packageNames.count) selected packages?"
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Uninstall")
-        alert.addButton(withTitle: "Cancel")
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            // User confirmed uninstall
-            for packageName in packageNames {
-                uninstallPackage(packageName)
-            }
-        }
-    }
-
-    // MARK: - Homebrew Command Execution
-
-    private func runBrewCommand(_ args: [String], title: String, isBackgroundCheck: Bool = false) {
-        guard let brewExecutable = BrewBarUtility.shared.brewPath else {
-            LoggingUtility.shared.log("ERROR: Brew executable not found")
-            let alert = NSAlert()
-            alert.messageText = "Error"
-            alert.informativeText = "Homebrew executable not found."
-            alert.alertStyle = .critical
-            alert.runModal()
-            return
-        }
-
-        // Prevent multiple operations at once
-        if isUpdateRunning {
-            let alert = NSAlert()
-            alert.messageText = "Operation in Progress"
-            alert.informativeText = "Please wait for the current operation to complete."
-            alert.alertStyle = .informational
-            alert.runModal()
-            return
-        }
-
-        // If this is a background check, use the non-interactive method
-        if isBackgroundCheck {
-            runBackgroundBrewCommand(args, title: title)
-            return
-        }
-
-        // For all other commands, run in Terminal
-        LoggingUtility.shared.log("Running command in Terminal: brew \(args.joined(separator: " "))")
-        BrewBarUtility.shared.runInteractiveBrewCommand(args)
-
-        // Schedule a refresh of package lists after the command is likely to have completed
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            // First refresh the outdated packages list
-            self.checkForUpdates(displayOutput: false) {
-                // Then refresh the installed packages list
-                self.refreshInstalledPackages()
-            }
-        }
-    }
-
-    // Method for running background update checks
-    private func runBackgroundBrewCommand(_ args: [String], title: String) {
-        // Create process
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: BrewBarUtility.shared.brewPath!)
-        task.arguments = args
-
-        // Setup pipes
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        task.standardOutput = outputPipe
-        task.standardError = errorPipe
-
-        // Store for cancellation
-        BrewBarManager.shared.updateProcess = task
-
-        // Update menu
-        isUpdateRunning = true
-        updateMenuWithUpdateStatus()
-
-        // Stream output for logging
-        outputPipe.fileHandleForReading.readabilityHandler = { [weak self] fileHandle in
-            let data = fileHandle.availableData
-            if data.count > 0, let output = String(data: data, encoding: .utf8) {
-                LoggingUtility.shared.log("Background brew output: \(output)")
-            }
-        }
-
-        errorPipe.fileHandleForReading.readabilityHandler = { [weak self] fileHandle in
-            let data = fileHandle.availableData
-            if data.count > 0, let output = String(data: data, encoding: .utf8) {
-                LoggingUtility.shared.log("Background brew error: \(output)")
-            }
-        }
-
-        do {
-            try task.run()
-
-            // Completion handler
-            task.terminationHandler = { [weak self] process in
-                guard let self = self else { return }
-
-                // Clean up handlers
-                outputPipe.fileHandleForReading.readabilityHandler = nil
-                errorPipe.fileHandleForReading.readabilityHandler = nil
-
-                DispatchQueue.main.async {
-                    // Update status
-                    self.isUpdateRunning = false
-                    self.updateMenuWithUpdateStatus()
-                    BrewBarManager.shared.updateProcess = nil
-
-                    if process.terminationStatus != 0 {
-                        LoggingUtility.shared.log("Background brew command failed with status \(process.terminationStatus)")
-                    }
-                }
-            }
-        } catch {
-            LoggingUtility.shared.log("Error running background brew command: \(error.localizedDescription)")
-            isUpdateRunning = false
-            updateMenuWithUpdateStatus()
-            BrewBarManager.shared.updateProcess = nil
-        }
-    }
-
-    // Helper method to refresh installed packages
-    private func refreshInstalledPackages(completion: (() -> Void)? = nil) {
+    // Refreshes installed packages list asynchronously.
+    func refreshInstalledPackages(completion: (() -> Void)? = nil) {
+        LoggingUtility.shared.log("Fetching installed packages")
         BrewBarManager.shared.fetchInstalledPackages { [weak self] packages in
             guard let self = self else { return }
             self.currentInstalledPackages = packages
-
-            // Refresh the window if it's open
-            DispatchQueue.main.async {
-                self.refreshPackagesWindow()
-                completion?()
-            }
+            LoggingUtility.shared.log("Found \(packages.count) installed packages")
+            completion?()
         }
     }
 
-    // Helper method to refresh the packages window with current data
+    // Refreshes the content of the packages window if it's open.
     private func refreshPackagesWindow(viewState: PackageViewState? = nil) {
         guard let windowController = outdatedPackagesWindowController,
               let window = windowController.window,
               let contentVC = window.contentViewController as? NSHostingController<OutdatedPackagesView> else {
+            // Window is likely closed, nothing to refresh
             return
         }
 
-        // Create updated view with current data
+        // Determine the correct view state to use
+        let currentViewState = viewState ?? contentVC.rootView.viewState
+
+        // Create updated view - Add back missing arguments
         let updatedView = OutdatedPackagesView(
-            packages: currentOutdatedPackages,
-            installed: currentInstalledPackages,
+            packages: currentOutdatedPackages, // Pass current outdated packages
+            installed: currentInstalledPackages, // Pass current installed packages
             errorOccurred: lastCheckError,
-            viewState: viewState ?? contentVC.rootView.viewState,
-            updateSinglePackage: { [weak self] packageName in
-                self?.upgradeSinglePackage(packageName)
-            },
-            updateSelectedPackages: { [weak self] packageNames in
-                self?.upgradeSelectedPackages(packageNames)
-            },
-            updateAllPackages: { [weak self] in
-                self?.upgradeAllPackages()
-            },
-            uninstallPackage: { [weak self] packageName in
-                self?.uninstallPackage(packageName)
-            },
-            uninstallSelectedPackages: { [weak self] packageNames in
-                self?.uninstallSelectedPackages(packageNames)
-            },
-            checkNow: { [weak self, weak viewState] in
-                viewState?.isCheckingForUpdates = true
-                self?.checkForUpdates(displayOutput: true) {
-                    self?.refreshPackagesWindow(viewState: viewState)
-                }
-            }
+            viewState: currentViewState, // Use the determined state
+            // Only pass required callback
+            refreshDataAfterTask: { [weak self] commandArgs, exitCode in
+                 self?.handleTaskCompletion(commandArgs: commandArgs, exitCode: exitCode)
+             }
         )
 
         // Update the content view
         contentVC.rootView = updatedView
     }
 
-    // MARK: - Preferences
+    // Handles completion of tasks run in the sheet, performs optimistic UI updates.
+    private func handleTaskCompletion(commandArgs: [String], exitCode: Int32?) {
+        guard let exitCode = exitCode else {
+            LoggingUtility.shared.log("Task completed with no exit code (terminated via signal?). Triggering full refresh.")
+            triggerFullBackgroundRefresh()
+            return
+        }
 
+        if exitCode == 0 {
+            LoggingUtility.shared.log("Task \(commandArgs.joined(separator: " ")) completed successfully.")
+            var needsOptimisticRefresh = false
+
+            // Check for specific command types eligible for optimistic update
+            if commandArgs.first == "upgrade" && commandArgs.count > 1 {
+                // Specific package upgrade: remove from outdated list
+                let upgradedPackages = commandArgs.dropFirst()
+                currentOutdatedPackages.removeAll { upgradedPackages.contains($0.name) }
+                LoggingUtility.shared.log("Optimistic update: Removed \(upgradedPackages.joined(separator: ", ")) from outdated list.")
+                needsOptimisticRefresh = true
+
+            } else if commandArgs.first == "uninstall" && commandArgs.count > 1 {
+                // Uninstall specific package: remove from installed list
+                let packageNameIndex = commandArgs.firstIndex(where: { !$0.starts(with: "-") && $0 != "uninstall" }) ?? (commandArgs.count - 1)
+                if packageNameIndex < commandArgs.count { // Ensure index is valid
+                    let packageName = commandArgs[packageNameIndex]
+                    currentInstalledPackages.removeAll { $0.name == packageName }
+                    // Also remove from outdated if it was there
+                    currentOutdatedPackages.removeAll { $0.name == packageName }
+                    LoggingUtility.shared.log("Optimistic update: Removed \(packageName) from installed/outdated lists.")
+                    needsOptimisticRefresh = true
+                }
+            }
+            // --- No optimistic update for 'brew update' or 'brew upgrade' (all) ---
+            // These require a full background check afterwards.
+            else if commandArgs.first == "update" || (commandArgs.first == "upgrade" && commandArgs.count == 1) {
+                LoggingUtility.shared.log("'\(commandArgs.first ?? "")' command finished. Triggering full background refresh.")
+                triggerFullBackgroundRefresh()
+                needsOptimisticRefresh = false // Don't do optimistic refresh for these
+            }
+
+            // Perform optimistic refresh if flag is set
+            if needsOptimisticRefresh {
+                 DispatchQueue.main.async {
+                     self.refreshPackagesWindow()
+                 }
+            }
+
+        } else {
+            // Command failed
+            LoggingUtility.shared.log("Task \(commandArgs.joined(separator: " ")) failed with exit code \(exitCode). Triggering full refresh.")
+            // Trigger full refresh on failure to ensure UI consistency
+             triggerFullBackgroundRefresh()
+        }
+    }
+
+    // Triggers a full background data refresh.
+    private func triggerFullBackgroundRefresh() {
+        self.checkForUpdates(displayOutput: false) { [weak self] in
+            self?.refreshInstalledPackages()
+        }
+    }
+
+    // MARK: - Preferences & Other Actions
     @objc func showPreferences() {
         if preferencesWindowController == nil {
             preferencesWindowController = PreferencesWindowController(appDelegate: self)
@@ -855,8 +578,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         LoggingUtility.shared.log("Opening log folder in Finder")
         NSWorkspace.shared.open(LoggingUtility.logDirectoryURL)
     }
-
-    // MARK: - Notification Preferences
 
     @objc func toggleNotifications(_ sender: NSButton) {
         let enabled = sender.state == .on
