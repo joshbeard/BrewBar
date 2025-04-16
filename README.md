@@ -10,7 +10,7 @@ you define.
 > This is a 0.x.x release under very active development from a maintainer with
 > little Swift/SwiftUI experience.
 >
-> So be aware that it might not work and will have bugs.
+> Beware that it will have bugs and it might not work.
 
 ## Features
 
