@@ -58,18 +58,11 @@ struct SwiftTermView: NSViewRepresentable {
             view.nativeForegroundColor = draculaForeground
             view.nativeBackgroundColor = draculaBackground
             view.enclosingScrollView?.scrollerKnobStyle = .light
-
-            // TODO: Implement setting full ANSI color palette using correct SwiftTerm API
-            // when found. Example: view.getTerminal().setAnsiColor(...)
-
         } else {
             // --- Apply Standard System Light Theme ---
              view.nativeForegroundColor = lightForeground
              view.nativeBackgroundColor = lightBackground
              view.enclosingScrollView?.scrollerKnobStyle = .dark
-
-             // TODO: Implement resetting ANSI colors to default if needed
-             // when switching back to light mode.
         }
          view.needsDisplay = true
     }

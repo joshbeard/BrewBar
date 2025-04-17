@@ -16,7 +16,7 @@ class PackageViewState: ObservableObject {
     @Published var showTerminalSheet: Bool = false
     @Published var terminalArgs: [String]? = nil
     @Published var terminalTitle: String = "Terminal"
-    @Published var terminalKey: UUID = UUID() // To force recreation
+    @Published var terminalKey: UUID = UUID()
 }
 
 // MARK: - SwiftUI View for Homebrew Packages
@@ -28,13 +28,13 @@ struct OutdatedPackagesView: View {
     @State private var selectedTab = 0
     @State private var searchText = ""
     let errorOccurred: Bool
-    @StateObject var viewState: PackageViewState // Changed to @StateObject as the view owns this state now
+    @StateObject var viewState: PackageViewState
 
     // Callbacks to trigger external actions
     let refreshDataAfterTask: (_ commandArgs: [String], _ exitCode: Int32?) -> Void
 
     // Get brew path (ideally passed in or from a shared utility)
-    private let brewExecutablePath = BrewBarUtility.shared.brewPath ?? "/opt/homebrew/bin/brew" // Fallback needed
+    private let brewExecutablePath = BrewBarUtility.shared.brewPath ?? "/opt/homebrew/bin/brew"
 
     init(packages: [PackageInfo],
          installed: [InstalledPackageInfo],
@@ -127,7 +127,7 @@ struct OutdatedPackagesView: View {
             }
         }
         .padding()
-        .frame(minWidth: 650, minHeight: 350) // Ensure minimum size even when there's an error
+        .frame(minWidth: 700, minHeight: 350) // Increased minWidth
         .sheet(isPresented: $viewState.showTerminalSheet) {
             // Sheet content: The Terminal View
             if let args = viewState.terminalArgs {
@@ -300,6 +300,7 @@ struct OutdatedPackagesView: View {
                     // Table of outdated packages
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 1) {
+                            // Outdated Packages Table Header Row
                             HStack {
                                 Text("Select")
                                     .fontWeight(.bold)
@@ -467,78 +468,12 @@ struct OutdatedPackagesView: View {
                     }
                     .padding(.horizontal)
 
-                    // Table of installed packages
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 1) {
-                            HStack {
-                                Text("Select")
-                                    .fontWeight(.bold)
-                                    .frame(width: 60, alignment: .leading)
-                                Text("Package")
-                                    .fontWeight(.bold)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                Text("Version")
-                                    .fontWeight(.bold)
-                                    .frame(width: 100, alignment: .leading)
-                                Text("Source")
-                                    .fontWeight(.bold)
-                                    .frame(width: 120, alignment: .leading)
-                                Text("Actions")
-                                    .fontWeight(.bold)
-                                    .frame(width: 60, alignment: .center)
-                            }
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                            .background(Color.gray.opacity(0.2))
-
-                            ForEach(filteredInstalledPackages) { package in
-                                HStack {
-                                    Checkbox(isChecked: Binding(
-                                        get: { selectedInstalledPackages.contains(package.name) },
-                                        set: { isSelected in
-                                            if isSelected {
-                                                selectedInstalledPackages.insert(package.name)
-                                            } else {
-                                                selectedInstalledPackages.remove(package.name)
-                                            }
-                                        }
-                                    ))
-                                    .frame(width: 60, alignment: .leading)
-
-                                    Text(package.name)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                                    Text(package.version)
-                                        .foregroundColor(.secondary)
-                                        .frame(width: 100, alignment: .leading)
-
-                                    Text(package.source)
-                                        .foregroundColor(.secondary)
-                                        .frame(width: 120, alignment: .leading)
-
-                                    Button(action: {
-                                        let isCask = package.source == "cask"
-                                        var args = ["uninstall"]
-                                        if isCask { args.append("--cask") }
-                                        args.append(package.name)
-                                        viewState.terminalArgs = args
-                                        viewState.terminalTitle = "Uninstalling \(package.name)..."
-                                        viewState.terminalKey = UUID()
-                                        viewState.showTerminalSheet = true
-                                    }) {
-                                        Image(systemName: "trash")
-                                            .foregroundColor(.red)
-                                    }
-                                    .buttonStyle(BorderlessButtonStyle())
-                                    .help("Uninstall \(package.name)")
-                                    .frame(width: 60, alignment: .center)
-                                }
-                                .padding(.horizontal)
-                                .padding(.vertical, 8)
-                                .background(selectedInstalledPackages.contains(package.name) ? Color.blue.opacity(0.1) : (filteredInstalledPackages.firstIndex(of: package)! % 2 == 0 ? Color.clear : Color.gray.opacity(0.05)))
-                            }
-                        }
-                    }
+                    // Replace ScrollView with the new struct
+                    InstalledPackagesTable(
+                        packages: filteredInstalledPackages,
+                        selectedPackages: $selectedInstalledPackages,
+                        viewState: viewState // Pass the viewState
+                    )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -565,6 +500,98 @@ struct OutdatedPackagesView: View {
                 $0.name.localizedCaseInsensitiveContains(searchText) ||
                 $0.source.localizedCaseInsensitiveContains(searchText) ||
                 $0.version.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+    }
+
+    // MARK: - Private Subviews
+
+    // New private struct for the installed packages table
+    private struct InstalledPackagesTable: View {
+        let packages: [InstalledPackageInfo]
+        @Binding var selectedPackages: Set<String>
+        @ObservedObject var viewState: PackageViewState // Receive viewState
+
+        private let brewExecutablePath = BrewBarUtility.shared.brewPath ?? "/opt/homebrew/bin/brew" // Need brew path here too
+
+        var body: some View {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 1) {
+                    // Installed Packages Table Header Row
+                    HStack {
+                        Text("Select")
+                            .fontWeight(.bold)
+                            .frame(width: 60, alignment: .leading)
+                        Text("Package")
+                            .fontWeight(.bold)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text("Version")
+                            .fontWeight(.bold)
+                            .frame(width: 100, alignment: .leading)
+                        Text("Source")
+                            .fontWeight(.bold)
+                            .frame(width: 120, alignment: .leading)
+                        Text("Actions")
+                            .fontWeight(.bold)
+                            .frame(width: 60, alignment: .center)
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color.gray.opacity(0.2))
+
+                    // Package Rows
+                    ForEach(packages) { package in
+                        HStack {
+                            // Checkbox
+                            Checkbox(isChecked: Binding(
+                                get: { selectedPackages.contains(package.name) },
+                                set: { isSelected in
+                                    if isSelected {
+                                        selectedPackages.insert(package.name)
+                                    } else {
+                                        selectedPackages.remove(package.name)
+                                    }
+                                }
+                            ))
+                            .frame(width: 60, alignment: .leading)
+
+                            // Package Name
+                            Text(package.name)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            // Version
+                            Text(package.version)
+                                .foregroundColor(.secondary)
+                                .frame(width: 100, alignment: .leading)
+
+                            // Source
+                            Text(package.source)
+                                .foregroundColor(.secondary)
+                                .frame(width: 120, alignment: .leading)
+
+                            // Uninstall Button
+                            Button(action: {
+                                let isCask = package.source == "cask"
+                                var args = ["uninstall"]
+                                if isCask { args.append("--cask") }
+                                args.append(package.name)
+                                viewState.terminalArgs = args
+                                viewState.terminalTitle = "Uninstalling \(package.name)..."
+                                viewState.terminalKey = UUID()
+                                viewState.showTerminalSheet = true
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                            .help("Uninstall \(package.name)")
+                            .frame(width: 60, alignment: .center)
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                        .background(selectedPackages.contains(package.name) ? Color.blue.opacity(0.1) : (packages.firstIndex(of: package)! % 2 == 0 ? Color.clear : Color.gray.opacity(0.05)))
+                    }
+                }
             }
         }
     }

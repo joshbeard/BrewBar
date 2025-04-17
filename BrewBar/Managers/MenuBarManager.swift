@@ -39,18 +39,18 @@ class MenuBarManager {
         outdatedPackagesMenuItem?.isEnabled = false // Display only
         menu?.addItem(outdatedPackagesMenuItem!)
 
-        // Add a last checked timestamp item
+        // -- Last Checked --
         let lastCheckedItem = NSMenuItem(title: "Last checked: Never", action: nil, keyEquivalent: "")
         lastCheckedItem.isEnabled = false // Display only
         lastCheckedItem.tag = 1001 // Tag for easy retrieval later
         menu?.addItem(lastCheckedItem)
 
-        // Add a next scheduled check item
+        // -- Next Scheduled Check --
         nextScheduledCheckMenuItem = NSMenuItem(title: "Next check: Not scheduled", action: nil, keyEquivalent: "")
         nextScheduledCheckMenuItem?.isEnabled = false // Display only
         menu?.addItem(nextScheduledCheckMenuItem!)
 
-        // Add "Show Outdated Packages" item
+        // -- Show Outdated Packages --
         let showOutdatedItem = NSMenuItem(title: "View Packages...", action: #selector(AppDelegate.showOutdatedPackagesWindow), keyEquivalent: "")
         showOutdatedItem.target = appDelegate
         showOutdatedItem.isEnabled = false // Initially disabled until first check completes
@@ -58,11 +58,10 @@ class MenuBarManager {
 
         menu?.addItem(NSMenuItem.separator())
 
-        // Add "Check interval" submenu
+        // -- Check Interval Submenu --
         let checkIntervalItem = NSMenuItem(title: "Check Interval", action: nil, keyEquivalent: "")
         checkIntervalSubmenu = NSMenu()
 
-        // Add interval options to submenu
         if let appDelegate = appDelegate {
             // Add all interval options to the submenu
             for (name, interval) in appDelegate.intervalOptions.sorted(by: { $0.value < $1.value }) {
@@ -80,7 +79,7 @@ class MenuBarManager {
         checkIntervalItem.submenu = checkIntervalSubmenu
         menu?.addItem(checkIntervalItem)
 
-        // Update and upgrade menu items
+        //  -- Update and Upgrade --
         let updateItem = NSMenuItem(title: "Update Homebrew", action: #selector(AppDelegate.runUpdate), keyEquivalent: "u")
         updateItem.target = appDelegate
         menu?.addItem(updateItem)
@@ -96,25 +95,26 @@ class MenuBarManager {
 
         menu?.addItem(NSMenuItem.separator())
 
-        // Add "Settings" menu item
+        //  -- Settings --
         let preferencesItem = NSMenuItem(title: "Settings...", action: #selector(AppDelegate.showPreferences), keyEquivalent: ",")
         preferencesItem.target = appDelegate
         menu?.addItem(preferencesItem)
 
-        // Add version info
+        //  -- Version ---
         menu?.addItem(NSMenuItem.separator())
         let versionString = getAppVersionString()
         let versionItem = NSMenuItem(title: versionString, action: nil, keyEquivalent: "")
         versionItem.isEnabled = false
         menu?.addItem(versionItem)
 
-        // Add GitHub link
+        //  -- GitHub --
         let githubItem = NSMenuItem(title: "View on GitHub", action: #selector(openGitHub), keyEquivalent: "")
         githubItem.target = self
         menu?.addItem(githubItem)
 
         menu?.addItem(NSMenuItem.separator())
 
+        //  -- Quit --
         let quitItem = NSMenuItem(title: "Quit BrewBar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu?.addItem(quitItem)
 
@@ -137,12 +137,13 @@ class MenuBarManager {
         menuRefreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.updateCheckNowMenuItemTitle()
         }
+
         // Allow timer to run even when menu is open
         RunLoop.current.add(menuRefreshTimer!, forMode: .common)
         LoggingUtility.shared.log("Scheduled menu refresh every minute.")
     }
 
-    // New function to update the last checked menu item
+    // Update the last checked menu item
     func updateLastCheckedMenuItem() {
         guard let lastCheckedItem = menu?.item(withTag: 1001),
               let lastCheckTime = appDelegate?.lastCheckTime else {
@@ -262,6 +263,7 @@ class MenuBarManager {
                 self.statusItem?.button?.image = NSImage(systemSymbolName: "mug.fill", accessibilityDescription: "\(count) Updates Available") // Icon indicating updates
 
                 // Truncate list for display
+                // TODO: This doesn't format well
                 let maxDisplay = 3
                 var displayString = "\(count) outdated package\(count == 1 ? "" : "s"):\n"
                 displayString += outdatedPackages.prefix(maxDisplay).map { $0.name }.joined(separator: "\n")
@@ -292,6 +294,7 @@ class MenuBarManager {
 
     // Open GitHub repository
     @objc func openGitHub() {
+        // TODO: Put URL somewhere more globally accessible
         if let url = URL(string: "https://github.com/joshbeard/BrewBar") {
             NSWorkspace.shared.open(url)
         }

@@ -2,7 +2,6 @@ import Cocoa
 import SwiftUI
 import UserNotifications
 import ServiceManagement
-// Make sure SwiftTerm is imported if needed, though it's used in SwiftTermView
 import SwiftTerm
 
 // MARK: - AppDelegate
@@ -322,7 +321,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Check if the closing window is our embedded terminal window
         else if (notification.object as? NSWindow) == embeddedTerminalWindowController?.window {
             LoggingUtility.shared.log("Embedded terminal window closed.")
-            // Optional: Interrupt process when window closes (might be desired)
+            // Optional: Interrupt process when window closes (TBD)
             // Remove the attempt to interrupt the internal process.
             /*
             if let hostingController = embeddedTerminalWindowController?.window?.contentViewController as? NSHostingController<SwiftTermView>,

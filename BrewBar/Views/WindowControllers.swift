@@ -147,7 +147,6 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
     }
 
     func createPreferencesWindow() -> NSWindow {
-        // Create the window with a taller size
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 600, height: 650),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],

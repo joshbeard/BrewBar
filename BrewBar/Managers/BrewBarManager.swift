@@ -1,6 +1,8 @@
 import Foundation
+import SwiftUI
 
 // MARK: - BrewBar Operation Manager
+
 class BrewBarManager {
     static let shared = BrewBarManager()
 
@@ -19,7 +21,8 @@ class BrewBarManager {
     // Current brew commands (read from UserDefaults or use defaults)
     var updateCommand: [String] {
         get {
-            return UserDefaults.standard.stringArray(forKey: updateCommandsKey) ?? defaultUpdateCommand
+            return UserDefaults.standard.stringArray(forKey: updateCommandsKey)
+                ?? defaultUpdateCommand
         }
         set {
             UserDefaults.standard.set(newValue, forKey: updateCommandsKey)
@@ -28,7 +31,8 @@ class BrewBarManager {
 
     var upgradeCommand: [String] {
         get {
-            return UserDefaults.standard.stringArray(forKey: upgradeCommandsKey) ?? defaultUpgradeCommand
+            return UserDefaults.standard.stringArray(forKey: upgradeCommandsKey)
+                ?? defaultUpgradeCommand
         }
         set {
             UserDefaults.standard.set(newValue, forKey: upgradeCommandsKey)
@@ -44,7 +48,9 @@ class BrewBarManager {
 
         for line in lines {
             // Skip empty lines or lines with our custom output
-            if line.isEmpty || line.contains("Checking for") || line.contains("Running:") || line.contains("==> Outdated") {
+            if line.isEmpty || line.contains("Checking for") || line.contains("Running:")
+                || line.contains("==> Outdated")
+            {
                 continue
             }
 
@@ -58,9 +64,12 @@ class BrewBarManager {
             var matched = false
 
             // Pattern 1: (version) != new_version or < new_version
-            if let regex = try? NSRegularExpression(pattern: "^([^ ]+) \\(([^)]+)\\) (!=|\\<) ([^ \\[]+)") {
+            if let regex = try? NSRegularExpression(
+                pattern: "^([^ ]+) \\(([^)]+)\\) (!=|\\<) ([^ \\[]+)")
+            {
                 let nsString = line as NSString
-                let matches = regex.matches(in: line, range: NSRange(location: 0, length: nsString.length))
+                let matches = regex.matches(
+                    in: line, range: NSRange(location: 0, length: nsString.length))
                 if let match = matches.first, match.numberOfRanges >= 5 {
                     packageName = nsString.substring(with: match.range(at: 1))
                     currentVersion = nsString.substring(with: match.range(at: 2))
@@ -70,9 +79,13 @@ class BrewBarManager {
             }
 
             // Pattern 2: current_version -> new_version (often used for casks or complex updates)
-            if !matched, let regex = try? NSRegularExpression(pattern: "^([^ ]+)\\s+([^ ]+)\\s+->\\s+([^ ]+)") {
+            if !matched,
+                let regex = try? NSRegularExpression(
+                    pattern: "^([^ ]+)\\s+([^ ]+)\\s+->\\s+([^ ]+)")
+            {
                 let nsString = line as NSString
-                let matches = regex.matches(in: line, range: NSRange(location: 0, length: nsString.length))
+                let matches = regex.matches(
+                    in: line, range: NSRange(location: 0, length: nsString.length))
                 if let match = matches.first, match.numberOfRanges >= 4 {
                     packageName = nsString.substring(with: match.range(at: 1))
                     currentVersion = nsString.substring(with: match.range(at: 2))
@@ -82,14 +95,14 @@ class BrewBarManager {
             }
 
             // Pattern 3: Catch simple names where versions might be missing or weird (fallback)
-            if !matched, let firstWord = line.components(separatedBy: " ").first, !firstWord.isEmpty {
-                 packageName = firstWord
-                 // Leave versions empty, enrichment step will handle if possible
-                 currentVersion = "?"
-                 availableVersion = "?"
-                 matched = true // Mark as matched to add to list
+            if !matched, let firstWord = line.components(separatedBy: " ").first, !firstWord.isEmpty
+            {
+                packageName = firstWord
+                // Leave versions empty, enrichment step will handle if possible
+                currentVersion = "?"
+                availableVersion = "?"
+                matched = true  // Mark as matched to add to list
             }
-
 
             // Only add if we got a package name
             if matched && !packageName.isEmpty {
@@ -97,7 +110,7 @@ class BrewBarManager {
                     name: packageName,
                     currentVersion: currentVersion,
                     availableVersion: availableVersion,
-                    source: "" // Source will be determined later
+                    source: ""  // Source will be determined later
                 )
                 packages.append(packageInfo)
             } else if !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -105,16 +118,9 @@ class BrewBarManager {
             }
         }
 
-        LoggingUtility.shared.log("Finished parsing \(packages.count) outdated packages (pre-enrichment)")
+        LoggingUtility.shared.log(
+            "Finished parsing \(packages.count) outdated packages (pre-enrichment)")
         return packages
-    }
-
-    // Helper method to enrich packages with tap information asynchronously
-    // THIS FUNCTION IS DEPRECATED and will be removed. Use enrichOutdatedPackagesWithSource instead.
-    func enrichPackagesWithTapInfo(packages: [PackageInfo], completion: @escaping ([PackageInfo]) -> Void) {
-        // ... function body remains but should not be called ...
-        LoggingUtility.shared.log("WARNING: Deprecated enrichPackagesWithTapInfo called.")
-        completion(packages) // Immediately return original packages
     }
 
     // Structs for parsing `brew info --json=v2 --installed`
@@ -125,25 +131,27 @@ class BrewBarManager {
     struct FormulaInfo: Decodable {
         let name: String
         let full_name: String
-        let tap: String? // e.g., "homebrew/core"
-        // Add other fields if needed
+        let tap: String?  // e.g., "homebrew/core"
     }
     struct CaskInfo: Decodable {
-        let token: String // This is the primary name/ID for casks
+        let token: String  // This is the primary name/ID for casks
         let full_token: String
-        let tap: String? // e.g., "homebrew/cask"
-        // Add other fields if needed
+        let tap: String?  // e.g., "homebrew/cask"
+        let installed: String?
     }
 
     // Enrich outdated packages with their source (formula/cask) using brew info
-    func enrichOutdatedPackagesWithSource(packages: [PackageInfo], completion: @escaping ([PackageInfo]) -> Void) {
+    func enrichOutdatedPackagesWithSource(
+        packages: [PackageInfo], completion: @escaping ([PackageInfo]) -> Void
+    ) {
         if packages.isEmpty {
             LoggingUtility.shared.log("Enrichment: No packages to enrich.")
             completion([])
             return
         }
 
-        LoggingUtility.shared.log("Enrichment: Starting source enrichment for \(packages.count) packages.")
+        LoggingUtility.shared.log(
+            "Enrichment: Starting source enrichment for \(packages.count) packages.")
 
         // Get installed formulas and casks first to use as reference
         let dispatchGroup = DispatchGroup()
@@ -182,7 +190,7 @@ class BrewBarManager {
             for i in 0..<enrichedPackages.count {
                 let packageName = enrichedPackages[i].name
 
-                // Simple, straightforward source determination
+                // Determine the source of the package
                 if installedCasks.contains(packageName) {
                     enrichedPackages[i].source = "cask"
                 } else if installedFormulae.contains(packageName) {
@@ -193,15 +201,16 @@ class BrewBarManager {
                     if components.count >= 2 {
                         enrichedPackages[i].source = components[0]
                     } else {
-                        enrichedPackages[i].source = "formula" // Default
+                        enrichedPackages[i].source = "formula"  // Default
                     }
                 } else {
                     // Directly check with brew info as a last resort
-                    var source = "formula" // Default to formula
+                    var source = "formula"
 
                     // Try to determine if it's a cask by running a synchronous command
                     let task = Process()
-                    task.executableURL = URL(fileURLWithPath: BrewBarUtility.shared.brewPath ?? "/opt/homebrew/bin/brew")
+                    task.executableURL = URL(
+                        fileURLWithPath: BrewBarUtility.shared.brewPath ?? "/opt/homebrew/bin/brew")
                     task.arguments = ["info", "--cask", packageName]
 
                     // Capture exit status only, output doesn't matter
@@ -223,7 +232,8 @@ class BrewBarManager {
                     enrichedPackages[i].source = source
                 }
 
-                LoggingUtility.shared.log("Set source for '\(packageName)' to '\(enrichedPackages[i].source)'")
+                LoggingUtility.shared.log(
+                    "Set source for '\(packageName)' to '\(enrichedPackages[i].source)'")
             }
 
             // Return the enriched packages on the main thread
@@ -235,10 +245,10 @@ class BrewBarManager {
 
     // Fetch installed Homebrew packages
     func fetchInstalledPackages(completion: @escaping ([InstalledPackageInfo]) -> Void) {
-        LoggingUtility.shared.log("Fetching installed packages")
+        NSLog("Fetching installed packages...")
 
-        guard BrewBarUtility.shared.brewPath != nil else {
-            LoggingUtility.shared.log("ERROR: Brew executable not found for fetching installed packages")
+        guard let brewPath = BrewBarUtility.shared.brewPath else {
+            NSLog("ERROR: Brew executable not found for fetching installed packages")
             completion([])
             return
         }
@@ -246,7 +256,7 @@ class BrewBarManager {
         let brewUtil = BrewBarUtility.shared
         var installedPackages: [InstalledPackageInfo] = []
 
-        // Fetch formulae and casks in parallel using dispatch groups
+        // Use a regular dispatch group to ensure both operations complete
         let dispatchGroup = DispatchGroup()
 
         // Fetch installed formulae
@@ -255,7 +265,7 @@ class BrewBarManager {
             defer { dispatchGroup.leave() }
 
             if let error = error {
-                LoggingUtility.shared.log("Error fetching formulae: \(error.localizedDescription)")
+                NSLog("Error fetching formulae: \(error.localizedDescription)")
                 return
             }
 
@@ -276,6 +286,7 @@ class BrewBarManager {
                         }
                     }
                 }
+                NSLog("✅ Processed \(formulaeLines.filter { !$0.isEmpty }.count) formulae")
             }
         }
 
@@ -285,7 +296,7 @@ class BrewBarManager {
             defer { dispatchGroup.leave() }
 
             if let error = error {
-                LoggingUtility.shared.log("Error fetching casks: \(error.localizedDescription)")
+                NSLog("Error fetching casks: \(error.localizedDescription)")
                 return
             }
 
@@ -306,14 +317,24 @@ class BrewBarManager {
                         }
                     }
                 }
+                NSLog("✅ Processed \(casksLines.filter { !$0.isEmpty }.count) casks initially")
             }
         }
 
         // When both operations complete, sort and return the packages
         dispatchGroup.notify(queue: .main) {
+            // First, let's make sure we have the right number of packages
+            NSLog("Found \(installedPackages.count) total installed packages")
+
+            // Just sort and return the packages without enrichment
             installedPackages.sort { $0.name < $1.name }
-            LoggingUtility.shared.log("Found \(installedPackages.count) installed packages")
             completion(installedPackages)
         }
+    }
+
+    // Simplified version that doesn't actually do enrichment
+    private func enrichCasksWithAutoUpdates(packages: [InstalledPackageInfo], completion: @escaping ([InstalledPackageInfo]) -> Void) {
+        // Just return the packages as-is
+        completion(packages)
     }
 }
