@@ -112,7 +112,8 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     // UNUserNotificationCenterDelegate method
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
-                                withCompletionHandler completionHandler: @escaping () -> Void) {
+                                withCompletionHandler completionHandler: @escaping () -> Void)
+    {
         // When user clicks on the notification, show the outdated packages window
         NotificationCenter.default.post(name: NSNotification.Name("ShowOutdatedPackagesWindow"), object: nil)
         completionHandler()

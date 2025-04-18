@@ -47,7 +47,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             "Every 6 Hours": 6 * 60 * 60,
             "Every Day": 24 * 60 * 60,
             "Every Week": 7 * 24 * 60 * 60,
-            "Manually": 0 // Use 0 for manual checks
+            "Manually": 0, // Use 0 for manual checks
         ]
 
         // Add any custom intervals from UserDefaults
@@ -265,7 +265,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func showOutdatedPackagesWindow() {
         // Check if window already exists and bring it to front
         if let existingController = outdatedPackagesWindowController,
-           let window = existingController.window {
+           let window = existingController.window
+        {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             // If the menu item was used, post notification to ensure sheet opens

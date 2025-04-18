@@ -49,7 +49,8 @@ class BrewBarManager {
         for line in lines {
             // Skip empty lines or lines with our custom output
             if line.isEmpty || line.contains("Checking for") || line.contains("Running:")
-                || line.contains("==> Outdated") {
+                || line.contains("==> Outdated")
+            {
                 continue
             }
 
@@ -64,7 +65,8 @@ class BrewBarManager {
 
             // Pattern 1: (version) != new_version or < new_version
             if let regex = try? NSRegularExpression(
-                pattern: "^([^ ]+) \\(([^)]+)\\) (!=|\\<) ([^ \\[]+)") {
+                pattern: "^([^ ]+) \\(([^)]+)\\) (!=|\\<) ([^ \\[]+)")
+            {
                 let nsString = line as NSString
                 let matches = regex.matches(
                     in: line, range: NSRange(location: 0, length: nsString.length))
@@ -79,7 +81,8 @@ class BrewBarManager {
             // Pattern 2: current_version -> new_version (often used for casks or complex updates)
             if !matched,
                let regex = try? NSRegularExpression(
-                   pattern: "^([^ ]+)\\s+([^ ]+)\\s+->\\s+([^ ]+)") {
+                   pattern: "^([^ ]+)\\s+([^ ]+)\\s+->\\s+([^ ]+)")
+            {
                 let nsString = line as NSString
                 let matches = regex.matches(
                     in: line, range: NSRange(location: 0, length: nsString.length))

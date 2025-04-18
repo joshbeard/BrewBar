@@ -42,7 +42,8 @@ struct OutdatedPackagesView: View {
          installed: [InstalledPackageInfo],
          errorOccurred: Bool = false,
          viewState: PackageViewState, // Pass the initial state
-         refreshDataAfterTask: @escaping (_ commandArgs: [String], _ exitCode: Int32?) -> Void) {
+         refreshDataAfterTask: @escaping (_ commandArgs: [String], _ exitCode: Int32?) -> Void)
+    {
         self.packagesInfo = packages
         self.installedPackages = installed
         self.errorOccurred = errorOccurred
