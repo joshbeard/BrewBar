@@ -80,8 +80,8 @@ class BrewBarManager {
 
             // Pattern 2: current_version -> new_version (often used for casks or complex updates)
             if !matched,
-                let regex = try? NSRegularExpression(
-                    pattern: "^([^ ]+)\\s+([^ ]+)\\s+->\\s+([^ ]+)")
+               let regex = try? NSRegularExpression(
+                   pattern: "^([^ ]+)\\s+([^ ]+)\\s+->\\s+([^ ]+)")
             {
                 let nsString = line as NSString
                 let matches = regex.matches(
@@ -95,8 +95,7 @@ class BrewBarManager {
             }
 
             // Pattern 3: Catch simple names where versions might be missing or weird (fallback)
-            if !matched, let firstWord = line.components(separatedBy: " ").first, !firstWord.isEmpty
-            {
+            if !matched, let firstWord = line.components(separatedBy: " ").first, !firstWord.isEmpty {
                 packageName = firstWord
                 // Leave versions empty, enrichment step will handle if possible
                 currentVersion = "?"
@@ -163,7 +162,7 @@ class BrewBarManager {
         BrewBarUtility.shared.runBrewCommand(["list", "--formula"]) { output, status, error in
             defer { dispatchGroup.leave() }
             if let formulaOutput = output, status == 0 {
-                formulaOutput.split(separator: "\n").forEach { name in
+                for name in formulaOutput.split(separator: "\n") {
                     installedFormulae.insert(String(name))
                 }
                 LoggingUtility.shared.log("Found \(installedFormulae.count) installed formulas")
@@ -175,7 +174,7 @@ class BrewBarManager {
         BrewBarUtility.shared.runBrewCommand(["list", "--cask"]) { output, status, error in
             defer { dispatchGroup.leave() }
             if let caskOutput = output, status == 0 {
-                caskOutput.split(separator: "\n").forEach { name in
+                for name in caskOutput.split(separator: "\n") {
                     installedCasks.insert(String(name))
                 }
                 LoggingUtility.shared.log("Found \(installedCasks.count) installed casks")
@@ -187,7 +186,7 @@ class BrewBarManager {
             // Now enrich each package
             var enrichedPackages = packages
 
-            for i in 0..<enrichedPackages.count {
+            for i in 0 ..< enrichedPackages.count {
                 let packageName = enrichedPackages[i].name
 
                 // Determine the source of the package
@@ -264,7 +263,7 @@ class BrewBarManager {
         brewUtil.runBrewCommand(["list", "--versions", "--formula"]) { formulaeOutput, status, error in
             defer { dispatchGroup.leave() }
 
-            if let error = error {
+            if let error {
                 NSLog("Error fetching formulae: \(error.localizedDescription)")
                 return
             }
@@ -295,7 +294,7 @@ class BrewBarManager {
         brewUtil.runBrewCommand(["list", "--versions", "--cask"]) { casksOutput, status, error in
             defer { dispatchGroup.leave() }
 
-            if let error = error {
+            if let error {
                 NSLog("Error fetching casks: \(error.localizedDescription)")
                 return
             }

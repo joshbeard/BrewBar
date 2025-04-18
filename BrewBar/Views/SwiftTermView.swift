@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftTerm
+import SwiftUI
 
 struct SwiftTermView: NSViewRepresentable {
     // Properties to configure the command to run
@@ -42,11 +42,10 @@ struct SwiftTermView: NSViewRepresentable {
 
         // Check if update is needed
         let currentBg = view.nativeBackgroundColor
-        let needsUpdate: Bool
-        if scheme == .dark {
-            needsUpdate = (currentBg != draculaBackground)
+        let needsUpdate: Bool = if scheme == .dark {
+            (currentBg != draculaBackground)
         } else {
-            needsUpdate = (currentBg != lightBackground)
+            (currentBg != lightBackground)
         }
 
         if !needsUpdate { return }
@@ -60,11 +59,11 @@ struct SwiftTermView: NSViewRepresentable {
             view.enclosingScrollView?.scrollerKnobStyle = .light
         } else {
             // --- Apply Standard System Light Theme ---
-             view.nativeForegroundColor = lightForeground
-             view.nativeBackgroundColor = lightBackground
-             view.enclosingScrollView?.scrollerKnobStyle = .dark
+            view.nativeForegroundColor = lightForeground
+            view.nativeBackgroundColor = lightBackground
+            view.enclosingScrollView?.scrollerKnobStyle = .dark
         }
-         view.needsDisplay = true
+        view.needsDisplay = true
     }
 
     // Coordinator acts as the delegate for process-related events.
@@ -113,21 +112,21 @@ struct SwiftTermView: NSViewRepresentable {
 
         func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
             // We could potentially update the window title here if desired
-             // For example: parent.window?.title = title
+            // For example: parent.window?.title = title
         }
 
-        func hostCurrentDirectoryUpdate (source: TerminalView, directory: String?) {
-             // Could use this to display the current PWD somewhere if needed
+        func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+            // Could use this to display the current PWD somewhere if needed
         }
     }
 }
 
 // Preview provider - requires a valid executable path
 #if DEBUG
-struct SwiftTermView_Previews: PreviewProvider {
-    static var previews: some View {
-        SwiftTermView(executablePath: "/bin/bash", arguments: ["-c", "echo 'Hello from SwiftTerm!'; sleep 2; echo 'Done.'; exit 0"])
-            .frame(width: 600, height: 400)
+    struct SwiftTermView_Previews: PreviewProvider {
+        static var previews: some View {
+            SwiftTermView(executablePath: "/bin/bash", arguments: ["-c", "echo 'Hello from SwiftTerm!'; sleep 2; echo 'Done.'; exit 0"])
+                .frame(width: 600, height: 400)
+        }
     }
-}
 #endif

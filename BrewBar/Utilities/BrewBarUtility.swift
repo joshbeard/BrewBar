@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - Homebrew Utility
+
 class BrewBarUtility {
     static let shared = BrewBarUtility()
 
@@ -11,7 +12,7 @@ class BrewBarUtility {
             "/opt/homebrew/bin/brew",      // Apple Silicon default
             "/usr/local/bin/brew",         // Intel Mac default
             "/usr/bin/brew",               // Another possible location
-            "/bin/brew"                    // Less common
+            "/bin/brew",                    // Less common
         ]
 
         // Check if any of the common paths exist
@@ -112,43 +113,43 @@ class BrewBarUtility {
         // Build the script content
         let brewCommand = "\(brewExec) \(args.joined(separator: " "))"
         let scriptContent = """
-        #!/bin/bash
-        set -e
+            #!/bin/bash
+            set -e
 
-        # Function to clean up the temp script
-        cleanup() {
-            rm -f "\(scriptPath.path)"
-        }
+            # Function to clean up the temp script
+            cleanup() {
+                rm -f "\(scriptPath.path)"
+            }
 
-        # Set up trap to clean up on exit
-        trap cleanup EXIT
+            # Set up trap to clean up on exit
+            trap cleanup EXIT
 
-        # Clear the screen and show header
-        clear
-        echo "=== BrewBar Command ==="
-        echo "Running: \(brewCommand)"
-        echo "===================="
-        echo
+            # Clear the screen and show header
+            clear
+            echo "=== BrewBar Command ==="
+            echo "Running: \(brewCommand)"
+            echo "===================="
+            echo
 
-        # Run the actual command and capture its exit status
-        set +e
-        \(brewCommand) 2>&1
-        STATUS=$?
-        set -e
+            # Run the actual command and capture its exit status
+            set +e
+            \(brewCommand) 2>&1
+            STATUS=$?
+            set -e
 
-        echo
-        if [ $STATUS -eq 0 ]; then
-            echo "✅ Command completed successfully (exit code: $STATUS)"
-        else
-            echo "❌ Command failed (exit code: $STATUS)"
-        fi
+            echo
+            if [ $STATUS -eq 0 ]; then
+                echo "✅ Command completed successfully (exit code: $STATUS)"
+            else
+                echo "❌ Command failed (exit code: $STATUS)"
+            fi
 
-        echo
-        read -p "Press return to close this window..."
+            echo
+            read -p "Press return to close this window..."
 
-        # Exit with the command's status
-        exit $STATUS
-        """
+            # Exit with the command's status
+            exit $STATUS
+            """
 
         do {
             // Write the script
@@ -160,7 +161,7 @@ class BrewBarUtility {
             task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
             task.arguments = [
                 "-a", "Terminal",
-                scriptPath.path
+                scriptPath.path,
             ]
 
             LoggingUtility.shared.log("Running brew command in Terminal: \(brewCommand)")

@@ -1,6 +1,7 @@
 import Cocoa
 
 // MARK: - Menu Bar Manager
+
 class MenuBarManager {
     weak var appDelegate: AppDelegate?
     var statusItem: NSStatusItem?
@@ -32,6 +33,7 @@ class MenuBarManager {
     }
 
     // MARK: - Menu Setup
+
     func setupMenu() {
         menu = NSMenu()
 
@@ -62,7 +64,7 @@ class MenuBarManager {
         let checkIntervalItem = NSMenuItem(title: "Check Interval", action: nil, keyEquivalent: "")
         checkIntervalSubmenu = NSMenu()
 
-        if let appDelegate = appDelegate {
+        if let appDelegate {
             // Add all interval options to the submenu
             for (name, interval) in appDelegate.intervalOptions.sorted(by: { $0.value < $1.value }) {
                 let intervalItem = NSMenuItem(title: name, action: #selector(AppDelegate.setIntervalFromMenu(_:)), keyEquivalent: "")
@@ -146,8 +148,8 @@ class MenuBarManager {
     // Update the last checked menu item
     func updateLastCheckedMenuItem() {
         guard let lastCheckedItem = menu?.item(withTag: 1001),
-              let lastCheckTime = appDelegate?.lastCheckTime else {
-
+              let lastCheckTime = appDelegate?.lastCheckTime
+        else {
             if let lastCheckedItem = menu?.item(withTag: 1001) {
                 lastCheckedItem.title = "Last checked: Never"
             }
@@ -180,7 +182,7 @@ class MenuBarManager {
                     nextScheduledCheckMenuItem.title = "Next check: Checking soon..."
                     // Only trigger reschedule if the time has actually passed (interval <= 0)
                     if interval <= 0, let appDelegate = self.appDelegate {
-                         appDelegate.scheduleUpdateTimer()
+                        appDelegate.scheduleUpdateTimer()
                     }
                 } else {
                     let timeUntil = self.formatTimeInterval(interval)
@@ -333,8 +335,9 @@ class MenuBarManager {
 
     // Update the check interval submenu to reflect current selection
     func updateCheckIntervalSubmenu() {
-        guard let appDelegate = appDelegate,
-              let submenu = checkIntervalSubmenu else {
+        guard let appDelegate,
+              let submenu = checkIntervalSubmenu
+        else {
             return
         }
 
@@ -350,8 +353,9 @@ class MenuBarManager {
 
     // Rebuild the items in the check interval submenu
     func rebuildIntervalSubmenuItems() {
-        guard let appDelegate = appDelegate,
-              let submenu = checkIntervalSubmenu else {
+        guard let appDelegate,
+              let submenu = checkIntervalSubmenu
+        else {
             LoggingUtility.shared.log("Error: Could not rebuild interval submenu - delegate or submenu missing")
             return
         }
@@ -370,6 +374,6 @@ class MenuBarManager {
             }
             submenu.addItem(intervalItem)
         }
-         LoggingUtility.shared.log("Finished rebuilding interval submenu with \(submenu.items.count) items")
+        LoggingUtility.shared.log("Finished rebuilding interval submenu with \(submenu.items.count) items")
     }
 }
