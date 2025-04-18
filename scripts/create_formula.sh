@@ -83,7 +83,7 @@ cask "brewbar" do
 
   uninstall quit:      "me.joshbeard.BrewBar",
             launchctl: "me.joshbeard.BrewBar",
-            delete:    "#{appdir}/BrewBar.app"
+            trash:    "#{appdir}/BrewBar.app"
 
   zap trash: [
     "~/Library/Application Support/BrewBar",
