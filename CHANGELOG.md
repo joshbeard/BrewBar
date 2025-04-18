@@ -2,6 +2,18 @@
 
 All notable changes to BrewBar will be documented in this file.
 
+## 0.0.14 - 2025-04-17
+
+- another brew cask fix
+
+## 0.0.13 - 2025-04-17
+
+- feature: log rotation
+
+## 0.0.12 - 2025-04-17
+
+- attempt fix for brew cask behavior
+
 ## 0.0.11 - 2025-04-17
 
 - fix: refresh outdated packages table after update
