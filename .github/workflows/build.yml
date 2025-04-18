@@ -51,18 +51,12 @@ jobs:
       run: |
         brew install swiftlint swiftformat
 
-    - name: Lint with SwiftFormat
+    - name: Run Linters
       if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-      run: swiftformat . --lint
-
-    - name: Lint with SwiftLint
-      if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-      run: swiftlint lint
+      run: make lint
 
     - name: Build app and create distribution packages
-      run: |
-        # Build the app, create DMG, ZIP, and formula
-        make release
+      run: make release
       env:
         VERSION: ${{ env.APP_VERSION }}
 
@@ -115,7 +109,7 @@ jobs:
         # Move artifacts to expected locations
         cp ./artifacts/BrewBar-zip/BrewBar.zip ./BrewBar.zip
         cp ./artifacts/BrewBar-dmg/BrewBar.dmg ./BrewBar.dmg
-        cp ./artifacts/homebrew-formula/brewbar.rb ./brewbar.rb
+        cp ./artifacts/homebrew-formula/brewbar.rb ./dist/brewbar.rb
 
         echo "Files ready for release:"
         ls -la .
@@ -136,25 +130,26 @@ jobs:
     - name: Update Homebrew tap
       env:
         TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
-        VERSION: ${{ needs.build.outputs.version }}
       run: |
-        if [ -z "$VERSION" ]; then
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "Using version from tag: $VERSION"
+        if [ -z "${{ needs.build.outputs.version }}" ]; then
+          echo "Error: Version not found from build job."
+          exit 1
         fi
 
-        # Make sure scripts are executable
+        # Make sure scripts are executable (Makefile might need them)
         chmod +x ./scripts/*.sh
 
         # Show debugging info
         echo "Files in current directory:"
         ls -la
+        echo "Files in dist directory:"
+        ls -la ./dist
 
-        # Check if brewbar.rb exists
-        if [ ! -f "brewbar.rb" ]; then
-          echo "Error: brewbar.rb not found in current directory"
+        # Check if brewbar.rb exists in dist
+        if [ ! -f "./dist/brewbar.rb" ]; then
+          echo "Error: brewbar.rb not found in ./dist directory"
           exit 1
         fi
 
-        # Update the Homebrew tap
-        ./scripts/update_tap.sh "$VERSION" "brewbar.rb"
+        # Update the Homebrew tap using make
+        make update-tap VERSION=${{ needs.build.outputs.version }}
