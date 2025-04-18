@@ -2,6 +2,10 @@
 
 All notable changes to BrewBar will be documented in this file.
 
+## 0.0.18 - 2025-04-17
+
+- prompt for restart when upgraded
+
 ## 0.0.17 - 2025-04-17
 
 - another brew cask fix

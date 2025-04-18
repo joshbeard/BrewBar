@@ -28,6 +28,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // Controller for the packages window
     var outdatedPackagesWindowController: NSWindowController?
 
+    // App version tracking for relaunch prompt
+    private var initialAppVersion: String?
+    private var appBundleIdentifier: String? // Or Homebrew formula/cask name
+
     // UserDefaults keys
     let intervalDefaultsKey = "updateCheckInterval"
     let customIntervalsKey = "customIntervals"
@@ -78,6 +82,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // Create the terminal window controller
         terminalWindowController = TerminalWindowController()
+
+        // Get initial app version and bundle ID
+        initialAppVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        appBundleIdentifier = "brewbar"
 
         // Start initial data load
         checkForUpdates(displayOutput: false) { [weak self] in
@@ -577,6 +585,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if exitCode == 0 {
             LoggingUtility.shared.log("Task \(commandArgs.joined(separator: " ")) completed successfully.")
             var needsOptimisticRefresh = false
+            var wasUpgradeAll = false
 
             // Check for specific command types eligible for optimistic update
             if commandArgs.first == "upgrade" && commandArgs.count > 1 {
@@ -585,6 +594,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 currentOutdatedPackages.removeAll { upgradedPackages.contains($0.name) }
                 LoggingUtility.shared.log("Optimistic update: Removed \(upgradedPackages.joined(separator: ", ")) from outdated list.")
                 needsOptimisticRefresh = true
+                // Check if this app was specifically upgraded
+                if let bundleId = appBundleIdentifier, upgradedPackages.contains(bundleId) {
+                    checkIfAppWasUpdated() // Check version after specific upgrade
+                }
 
             } else if commandArgs.first == "uninstall" && commandArgs.count > 1 {
                 // Uninstall specific package: remove from installed list
@@ -602,7 +615,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // These require a full background check afterwards.
             else if commandArgs.first == "update" || (commandArgs.first == "upgrade" && commandArgs.count == 1) {
                 LoggingUtility.shared.log("'\(commandArgs.first ?? "")' command finished. Triggering full background refresh.")
-                triggerFullBackgroundRefresh()
+                if commandArgs.first == "upgrade" {
+                    wasUpgradeAll = true // Mark that upgrade all was run
+                }
+                triggerFullBackgroundRefresh() // Refresh data immediately
                 needsOptimisticRefresh = false // Don't do optimistic refresh for these
             }
 
@@ -611,6 +627,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                  DispatchQueue.main.async {
                      self.refreshPackagesWindow()
                  }
+            }
+
+            // Check for app update *after* upgrade-all refresh is triggered
+            if wasUpgradeAll {
+                checkIfAppWasUpdated()
             }
 
         } else {
@@ -647,6 +668,89 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func triggerFullBackgroundRefresh() {
         self.checkForUpdates(displayOutput: false) { [weak self] in
             self?.refreshInstalledPackages()
+        }
+    }
+
+    // MARK: - App Update Check & Relaunch
+
+    private func checkIfAppWasUpdated() {
+        guard let bundleId = appBundleIdentifier, let initialVersion = initialAppVersion, initialVersion != "Unknown" else {
+            LoggingUtility.shared.log("Cannot check for app update: Missing bundle ID or initial version.")
+            return
+        }
+
+        LoggingUtility.shared.log("Checking if app (\(bundleId)) was updated...")
+
+        // Use `brew list --versions <bundleId>` to get the currently installed version
+        // Example assumes bundleId is the correct formula/cask name for brew
+        BrewBarUtility.shared.runBrewCommand(["list", "--versions", bundleId]) { [weak self] output, exitCode, error in
+            guard let self = self else { return }
+
+            guard exitCode == 0, let output = output, error == nil else {
+                LoggingUtility.shared.log("Failed to get current version for \(bundleId) via brew. Error: \(error?.localizedDescription ?? "Exit code \(exitCode)"), Output: \(output ?? "N/A")")
+                return
+            }
+
+            // Parse the output (e.g., "brewbar 1.2.3")
+            let components = output.split(separator: " ", maxSplits: 1)
+            if components.count == 2, let installedVersion = components.last?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                LoggingUtility.shared.log("Initial version: \(initialVersion), Currently installed version: \(installedVersion)")
+                if installedVersion != initialVersion {
+                    LoggingUtility.shared.log("App update detected! \(bundleId) changed from \(initialVersion) to \(installedVersion).")
+                    DispatchQueue.main.async {
+                        self.promptForRelaunch()
+                    }
+                } else {
+                    LoggingUtility.shared.log("App (\(bundleId)) version (\(initialVersion)) hasn't changed.")
+                }
+            } else {
+                 LoggingUtility.shared.log("Could not parse version from brew output: \(output)")
+            }
+        }
+    }
+
+    private func promptForRelaunch() {
+        let alert = NSAlert()
+        alert.messageText = "Application Updated"
+        alert.informativeText = "BrewBar was updated to a new version. Relaunch now to apply the changes?"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Relaunch Now")
+        alert.addButton(withTitle: "Later")
+
+        let response = alert.runModal()
+
+        if response == .alertFirstButtonReturn { // Relaunch Now
+            relaunchApp()
+        }
+    }
+
+    private func relaunchApp() {
+        LoggingUtility.shared.log("Relaunching application...")
+        guard let appPath = Bundle.main.executablePath else {
+            LoggingUtility.shared.log("Error: Could not get application path for relaunch.")
+            return
+        }
+
+        // Use Process to launch 'open -a' after a short delay, then terminate self
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        task.arguments = ["-a", appPath]
+
+        // Optional: add a delay if needed, though 'open' might handle this gracefully
+        // task.arguments = ["-g", "-a", appPath] // -g runs in background, might be smoother
+
+        do {
+            try task.run()
+            LoggingUtility.shared.log("Relaunch command executed. Terminating current instance.")
+            NSApp.terminate(nil)
+        } catch {
+            LoggingUtility.shared.log("Failed to relaunch application: \(error)")
+
+            let alert = NSAlert()
+            alert.messageText = "Failed to relaunch application"
+            alert.informativeText = "Please relaunch the application manually."
+            alert.alertStyle = .critical
+            alert.runModal()
         }
     }
 
