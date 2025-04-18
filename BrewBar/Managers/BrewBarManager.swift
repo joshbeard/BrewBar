@@ -49,8 +49,7 @@ class BrewBarManager {
         for line in lines {
             // Skip empty lines or lines with our custom output
             if line.isEmpty || line.contains("Checking for") || line.contains("Running:")
-                || line.contains("==> Outdated")
-            {
+                || line.contains("==> Outdated") {
                 continue
             }
 
@@ -65,8 +64,7 @@ class BrewBarManager {
 
             // Pattern 1: (version) != new_version or < new_version
             if let regex = try? NSRegularExpression(
-                pattern: "^([^ ]+) \\(([^)]+)\\) (!=|\\<) ([^ \\[]+)")
-            {
+                pattern: "^([^ ]+) \\(([^)]+)\\) (!=|\\<) ([^ \\[]+)") {
                 let nsString = line as NSString
                 let matches = regex.matches(
                     in: line, range: NSRange(location: 0, length: nsString.length))
@@ -81,8 +79,7 @@ class BrewBarManager {
             // Pattern 2: current_version -> new_version (often used for casks or complex updates)
             if !matched,
                let regex = try? NSRegularExpression(
-                   pattern: "^([^ ]+)\\s+([^ ]+)\\s+->\\s+([^ ]+)")
-            {
+                   pattern: "^([^ ]+)\\s+([^ ]+)\\s+->\\s+([^ ]+)") {
                 let nsString = line as NSString
                 let matches = regex.matches(
                     in: line, range: NSRange(location: 0, length: nsString.length))
@@ -159,7 +156,7 @@ class BrewBarManager {
 
         // Get installed formulas
         dispatchGroup.enter()
-        BrewBarUtility.shared.runBrewCommand(["list", "--formula"]) { output, status, error in
+        BrewBarUtility.shared.runBrewCommand(["list", "--formula"]) { output, status, _ in
             defer { dispatchGroup.leave() }
             if let formulaOutput = output, status == 0 {
                 for name in formulaOutput.split(separator: "\n") {
@@ -171,7 +168,7 @@ class BrewBarManager {
 
         // Get installed casks
         dispatchGroup.enter()
-        BrewBarUtility.shared.runBrewCommand(["list", "--cask"]) { output, status, error in
+        BrewBarUtility.shared.runBrewCommand(["list", "--cask"]) { output, status, _ in
             defer { dispatchGroup.leave() }
             if let caskOutput = output, status == 0 {
                 for name in caskOutput.split(separator: "\n") {
@@ -260,7 +257,7 @@ class BrewBarManager {
 
         // Fetch installed formulae
         dispatchGroup.enter()
-        brewUtil.runBrewCommand(["list", "--versions", "--formula"]) { formulaeOutput, status, error in
+        brewUtil.runBrewCommand(["list", "--versions", "--formula"]) { formulaeOutput, _, error in
             defer { dispatchGroup.leave() }
 
             if let error {
@@ -291,7 +288,7 @@ class BrewBarManager {
 
         // Fetch installed casks
         dispatchGroup.enter()
-        brewUtil.runBrewCommand(["list", "--versions", "--cask"]) { casksOutput, status, error in
+        brewUtil.runBrewCommand(["list", "--versions", "--cask"]) { casksOutput, _, error in
             defer { dispatchGroup.leave() }
 
             if let error {

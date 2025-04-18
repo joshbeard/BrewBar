@@ -14,7 +14,7 @@ class PackageViewState: ObservableObject {
     @Published var isCheckingForUpdates: Bool = false
     // Add state for the embedded terminal
     @Published var showTerminalSheet: Bool = false
-    @Published var terminalArgs: [String]? = nil
+    @Published var terminalArgs: [String]?
     @Published var terminalTitle: String = "Terminal"
     @Published var terminalKey: UUID = UUID()
     @Published var isTerminalProcessRunning: Bool = false
@@ -42,8 +42,7 @@ struct OutdatedPackagesView: View {
          installed: [InstalledPackageInfo],
          errorOccurred: Bool = false,
          viewState: PackageViewState, // Pass the initial state
-         refreshDataAfterTask: @escaping (_ commandArgs: [String], _ exitCode: Int32?) -> Void)
-    {
+         refreshDataAfterTask: @escaping (_ commandArgs: [String], _ exitCode: Int32?) -> Void) {
         self.packagesInfo = packages
         self.installedPackages = installed
         self.errorOccurred = errorOccurred

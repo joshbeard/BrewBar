@@ -46,7 +46,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         center.setNotificationCategories([updateCategory])
 
         // Request permission to show notifications
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
             if granted {
                 LoggingUtility.shared.log("Notification permission granted.")
                 self.notificationsAuthorized = true
@@ -112,8 +112,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     // UNUserNotificationCenterDelegate method
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
-                                withCompletionHandler completionHandler: @escaping () -> Void)
-    {
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
         // When user clicks on the notification, show the outdated packages window
         NotificationCenter.default.post(name: NSNotification.Name("ShowOutdatedPackagesWindow"), object: nil)
         completionHandler()

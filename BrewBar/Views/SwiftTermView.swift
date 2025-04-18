@@ -6,7 +6,7 @@ struct SwiftTermView: NSViewRepresentable {
     let executablePath: String
     let arguments: [String]
     // Callback for when the hosted process terminates.
-    var onProcessEnd: ((_ commandArgs: [String], _ exitCode: Int32?) -> Void)? = nil
+    var onProcessEnd: ((_ commandArgs: [String], _ exitCode: Int32?) -> Void)?
 
     // Observe the SwiftUI color scheme environment
     @Environment(\.colorScheme) var colorScheme

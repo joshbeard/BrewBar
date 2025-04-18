@@ -12,7 +12,7 @@ class BrewBarUtility {
             "/opt/homebrew/bin/brew",      // Apple Silicon default
             "/usr/local/bin/brew",         // Intel Mac default
             "/usr/bin/brew",               // Another possible location
-            "/bin/brew",                    // Less common
+            "/bin/brew"                    // Less common
         ]
 
         // Check if any of the common paths exist
@@ -161,7 +161,7 @@ class BrewBarUtility {
             task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
             task.arguments = [
                 "-a", "Terminal",
-                scriptPath.path,
+                scriptPath.path
             ]
 
             LoggingUtility.shared.log("Running brew command in Terminal: \(brewCommand)")

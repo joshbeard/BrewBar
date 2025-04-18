@@ -47,7 +47,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             "Every 6 Hours": 6 * 60 * 60,
             "Every Day": 24 * 60 * 60,
             "Every Week": 7 * 24 * 60 * 60,
-            "Manually": 0, // Use 0 for manual checks
+            "Manually": 0 // Use 0 for manual checks
         ]
 
         // Add any custom intervals from UserDefaults
@@ -88,7 +88,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Start initial data load
         checkForUpdates(displayOutput: false) { [weak self] in
             guard let self else { return }
-            self.refreshInstalledPackages() {
+            self.refreshInstalledPackages {
                 self.scheduleUpdateTimer()
                 // Final UI update after all initial loading
                 self.menuBarManager.updateMenu(outdatedPackages: self.currentOutdatedPackages,
@@ -265,8 +265,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func showOutdatedPackagesWindow() {
         // Check if window already exists and bring it to front
         if let existingController = outdatedPackagesWindowController,
-           let window = existingController.window
-        {
+           let window = existingController.window {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             // If the menu item was used, post notification to ensure sheet opens
@@ -433,7 +432,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             LoggingUtility.shared.log("Running brew update: \(updateCommand.joined(separator: " "))")
 
             // Use the utility method to run the command
-            BrewBarUtility.shared.runBrewCommand(updateCommand) { [weak self] output, exitCode, error in
+            BrewBarUtility.shared.runBrewCommand(updateCommand) { [weak self] _, exitCode, error in
                 guard let self else {
                     completion?()
                     return
@@ -653,7 +652,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self.checkForUpdates(displayOutput: false) { [weak self] in
                 guard let self else { return }
 
-                self.refreshInstalledPackages() {
+                self.refreshInstalledPackages {
                     // Force refresh UI after data updates
                     self.refreshPackagesWindow()
 

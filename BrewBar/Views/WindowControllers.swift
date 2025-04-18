@@ -101,7 +101,7 @@ class TerminalWindowController {
                 string: text,
                 attributes: [
                     .foregroundColor: color,
-                    .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
+                    .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
                 ]
             )
 
@@ -188,7 +188,7 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
                 tabView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
                 tabView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
                 tabView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
-                tabView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
+                tabView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10)
             ])
         }
 
@@ -209,7 +209,7 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
             container.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
             container.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            container.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20),
+            container.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20)
         ])
 
         // Title
@@ -359,7 +359,7 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
         // Constraints for title
         NSLayoutConstraint.activate([
             titleLabel.topAnchor.constraint(equalTo: container.topAnchor),
-            titleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            titleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor)
         ])
 
         // Constraints for interval selection
@@ -369,7 +369,7 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
 
             intervalPopup.centerYAnchor.constraint(equalTo: refreshIntervalLabel.centerYAnchor),
             intervalPopup.leadingAnchor.constraint(equalTo: refreshIntervalLabel.trailingAnchor, constant: 10),
-            intervalPopup.widthAnchor.constraint(equalToConstant: 200),
+            intervalPopup.widthAnchor.constraint(equalToConstant: 200)
         ])
 
         // Constraints for custom intervals section
@@ -401,7 +401,7 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
             scrollView.topAnchor.constraint(equalTo: addButton.bottomAnchor, constant: 10),
             scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            scrollView.heightAnchor.constraint(equalToConstant: 150),
+            scrollView.heightAnchor.constraint(equalToConstant: 150)
         ])
 
         // Constraints for login and notification options
@@ -410,7 +410,7 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
             loginItemCheckbox.leadingAnchor.constraint(equalTo: container.leadingAnchor),
 
             notificationsCheckbox.topAnchor.constraint(equalTo: loginItemCheckbox.bottomAnchor, constant: 10),
-            notificationsCheckbox.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            notificationsCheckbox.leadingAnchor.constraint(equalTo: container.leadingAnchor)
         ])
 
         // Constraints for debug section
@@ -419,7 +419,7 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
             logsFolderLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor),
 
             openLogsButton.topAnchor.constraint(equalTo: logsFolderLabel.bottomAnchor, constant: 10),
-            openLogsButton.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            openLogsButton.leadingAnchor.constraint(equalTo: container.leadingAnchor)
         ])
 
         return view
@@ -439,7 +439,7 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
             container.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
             container.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            container.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20),
+            container.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20)
         ])
 
         // Title
@@ -523,7 +523,7 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
 
             descriptionLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 5),
             descriptionLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            descriptionLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            descriptionLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor)
         ])
 
         // Constraints for update command
@@ -533,7 +533,7 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
 
             updateCommandField.topAnchor.constraint(equalTo: updateCommandLabel.bottomAnchor, constant: 5),
             updateCommandField.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            updateCommandField.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            updateCommandField.trailingAnchor.constraint(equalTo: container.trailingAnchor)
         ])
 
         // Constraints for upgrade command
@@ -543,14 +543,14 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
 
             upgradeCommandField.topAnchor.constraint(equalTo: upgradeCommandLabel.bottomAnchor, constant: 5),
             upgradeCommandField.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            upgradeCommandField.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            upgradeCommandField.trailingAnchor.constraint(equalTo: container.trailingAnchor)
         ])
 
         // Constraints for help text
         NSLayoutConstraint.activate([
             helpText.topAnchor.constraint(equalTo: upgradeCommandField.bottomAnchor, constant: 15),
             helpText.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            helpText.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            helpText.trailingAnchor.constraint(equalTo: container.trailingAnchor)
         ])
 
         // Constraints for buttons
@@ -559,7 +559,7 @@ class PreferencesWindowController: NSObject, NSTableViewDataSource, NSTableViewD
             saveButton.trailingAnchor.constraint(equalTo: container.trailingAnchor),
 
             resetButton.centerYAnchor.constraint(equalTo: saveButton.centerYAnchor),
-            resetButton.trailingAnchor.constraint(equalTo: saveButton.leadingAnchor, constant: -10),
+            resetButton.trailingAnchor.constraint(equalTo: saveButton.leadingAnchor, constant: -10)
         ])
 
         return view
