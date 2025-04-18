@@ -59,20 +59,6 @@ cask "brewbar" do
 
   app "BrewBar.app"
 
-  # Ensure permissions before uninstall
-  uninstall_preflight do
-    if File.exist?("#{appdir}/BrewBar.app")
-      system_command "chown", args: ["-R", "#{ENV['USER']}:admin", "#{appdir}/BrewBar.app"]
-      system_command "chmod", args: ["-R", "u+rw", "#{appdir}/BrewBar.app"]
-    end
-  end
-
-  # Ensure permissions before install
-  preflight do
-    system_command "chown", args: ["#{ENV['USER']}:admin", "#{appdir}"]
-    system_command "chmod", args: ["u+rw", "#{appdir}"]
-  end
-
   # Remove quarantine attribute
   postflight do
     system_command "xattr", args: ["-d", "com.apple.quarantine", "#{appdir}/BrewBar.app"]
@@ -81,7 +67,7 @@ cask "brewbar" do
   end
 
   uninstall quit:      "me.joshbeard.BrewBar",
-            launchctl: "me.joshbeard.BrewBar",
+            launchctl: "me.joshbeard.BrewBar"
 
   zap trash: [
     "~/Library/Application Support/BrewBar",
