@@ -603,6 +603,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // Trigger full refresh on failure to ensure UI consistency
              triggerFullBackgroundRefresh()
         }
+
+        // Ensure UI is always updated
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.checkForUpdates(displayOutput: false) { [weak self] in
+                self?.refreshInstalledPackages() {
+                    // Force refresh UI after data updates
+                    self?.refreshPackagesWindow()
+                    self?.menuBarManager.updateMenu(outdatedPackages: self?.currentOutdatedPackages ?? [],
+                                                  checking: false,
+                                                  errorOccurred: self?.lastCheckError ?? false)
+                }
+            }
+        }
     }
 
     // Triggers a full background data refresh.
