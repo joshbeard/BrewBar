@@ -2,6 +2,11 @@
 
 All notable changes to BrewBar will be documented in this file.
 
+## 0.0.19 - 2025-04-18
+
+- confirmation when closing a running process
+- improve relative time display for "next update" in menu item
+
 ## 0.0.18 - 2025-04-17
 
 - prompt for restart when upgraded

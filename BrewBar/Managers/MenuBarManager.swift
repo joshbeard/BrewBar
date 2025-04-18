@@ -171,30 +171,39 @@ class MenuBarManager {
             }
 
             if let nextCheckTime = self.appDelegate?.nextScheduledCheckTime {
-                // Calculate how much time until next check
                 let interval = nextCheckTime.timeIntervalSinceNow
+                let now = Date()
+                let calendar = Calendar.current
 
-                // Check if next check time is in the past
-                if interval <= 0 {
+                // Check if next check time is in the past or very near future
+                if interval <= 5 { // Use a small buffer instead of exactly 0
                     nextScheduledCheckMenuItem.title = "Next check: Checking soon..."
-
-                    // Notify app delegate that it's time to reschedule the timer
-                    if let appDelegate = self.appDelegate {
-                        DispatchQueue.main.async {
-                            appDelegate.scheduleUpdateTimer() // This will recalculate next check time
-                        }
+                    // Only trigger reschedule if the time has actually passed (interval <= 0)
+                    if interval <= 0, let appDelegate = self.appDelegate {
+                         appDelegate.scheduleUpdateTimer()
                     }
                 } else {
-                    // Format the next check time
-                    let formatter = DateFormatter()
-                    formatter.dateStyle = .none
-                    formatter.timeStyle = .short
-                    let timeString = formatter.string(from: nextCheckTime)
-
-                    // Format the time until next check
                     let timeUntil = self.formatTimeInterval(interval)
 
-                    nextScheduledCheckMenuItem.title = "Next check: \(timeString) (\(timeUntil))"
+                    // Format the next check time based on how far in the future it is
+                    let timeFormatter = DateFormatter()
+                    timeFormatter.timeStyle = .short // e.g., 8:30 AM
+                    let timeString = timeFormatter.string(from: nextCheckTime)
+
+                    let dateFormatter = DateFormatter()
+                    var dateString = ""
+
+                    if calendar.isDateInTomorrow(nextCheckTime) {
+                        dateString = "Tomorrow at \(timeString)"
+                    } else if calendar.isDateInToday(nextCheckTime) {
+                        dateString = "Today at \(timeString)"
+                    } else {
+                        // If it's further than tomorrow, show Month Day at Time
+                        dateFormatter.dateFormat = "MMM d 'at' h:mm a" // e.g., Jun 10 at 8:30 AM
+                        dateString = dateFormatter.string(from: nextCheckTime)
+                    }
+
+                    nextScheduledCheckMenuItem.title = "Next check: \(dateString) (\(timeUntil))"
                 }
             } else {
                 nextScheduledCheckMenuItem.title = "Next check: Manual only"
@@ -205,7 +214,14 @@ class MenuBarManager {
     // Format a time interval in a human-readable way
     private func formatTimeInterval(_ interval: TimeInterval) -> String {
         if interval <= 0 {
+            // This path shouldn't be hit based on the calling logic in updateNextCheckMenuItem
+            // but good to handle defensively.
             return "now"
+        }
+
+        // Handle intervals less than a minute
+        if interval < 60 {
+            return "< 1m"
         }
 
         let minutes = Int(interval / 60) % 60
@@ -214,6 +230,7 @@ class MenuBarManager {
         if hours > 0 {
             return "\(hours)h \(minutes)m"
         } else {
+            // Only minutes left (guaranteed > 0 because interval >= 60)
             return "\(minutes)m"
         }
     }
