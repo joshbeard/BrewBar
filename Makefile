@@ -3,12 +3,14 @@
 # This Makefile coordinates the build and release process for BrewBar.
 # It serves as both a local development tool and is used by CI.
 
-.PHONY: all clean build version app dmg zip formula release
+.PHONY: all clean build version app dmg zip formula release lint optimize-images
 
 # Default version derived from git if not specified
 VERSION ?= $(shell if [ -x scripts/get_version.sh ]; then scripts/get_version.sh; else echo "dev-unknown"; fi)
 BUILT_APP = BrewBar.app
 DIST_DIR = ./dist
+OPTIMIZE_SRC = .github/readme/unoptimized
+OPTIMIZE_DEST = .github/readme/optimized
 
 all: build
 
@@ -27,6 +29,13 @@ clean:
 	@rm -rf build $(BUILT_APP) $(DIST_DIR)
 	@rm -f BrewBar.zip BrewBar.dmg
 	@rm -f entitlements.plist brewbar.rb
+
+# Lint the codebase
+lint:
+	@echo "Linting with SwiftFormat..."
+	@swiftformat . --lint
+	@echo "Linting with SwiftLint..."
+	@swiftlint lint
 
 # Build the app with specified or auto-detected version
 build:
@@ -84,3 +93,14 @@ update-tap: formula
 	else \
 		scripts/update_tap.sh "$(VERSION)" "$(DIST_DIR)/brewbar.rb"; \
 	fi
+
+# Optimize images for README
+optimize-images:
+	@echo "Optimizing images from $(OPTIMIZE_SRC) to $(OPTIMIZE_DEST)..."
+	@mkdir -p "$(OPTIMIZE_DEST)"
+	@find "$(OPTIMIZE_SRC)" -maxdepth 1 \( -name '*.jpg' -o -name '*.jpeg' -o -name '*.png' -o -name '*.gif' \) -print0 | while IFS= read -r -d $$'\0' file; do \
+		filename=$$(basename "$$file"); \
+		echo "  Optimizing $$filename..."; \
+		convert "$$file" -strip -quality 85 "$(OPTIMIZE_DEST)/$$filename"; \
+	done
+	@echo "Image optimization complete."
