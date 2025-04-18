@@ -46,6 +46,19 @@ jobs:
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
       id: setup_env
 
+    - name: Install Linters
+      if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      run: |
+        brew install swiftlint swiftformat
+
+    - name: Lint with SwiftFormat
+      if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      run: swiftformat . --lint
+
+    - name: Lint with SwiftLint
+      if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      run: swiftlint lint
+
     - name: Build app and create distribution packages
       run: |
         # Build the app, create DMG, ZIP, and formula

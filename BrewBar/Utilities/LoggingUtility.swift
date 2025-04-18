@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - Logging Utilities
+
 class LoggingUtility {
     static let shared = LoggingUtility()
 
@@ -114,7 +115,8 @@ class LoggingUtility {
                 // Extract date from filename (format: brewbar-YYYY-MM-DD.log)
                 let filename = fileURL.lastPathComponent
                 guard filename.hasPrefix("brewbar-"),
-                      filename.hasSuffix(".log") else {
+                      filename.hasSuffix(".log")
+                else {
                     continue
                 }
 

@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - Crash Reporting
+
 // Global function for uncaught exceptions (required for C function compatibility)
 func handleUncaughtException(_ exception: NSException) {
     let stack = exception.callStackSymbols.joined(separator: "\n")
@@ -53,17 +54,17 @@ class CrashReporter {
             let systemVersion = ProcessInfo.processInfo.operatingSystemVersionString
 
             let crashReport = """
-            BrewBar Crash Report
-            Version: \(appVersion) (\(buildNumber))
-            System: \(systemVersion)
-            Date: \(DateFormatter.localizedString(from: Date(), dateStyle: .full, timeStyle: .full))
+                BrewBar Crash Report
+                Version: \(appVersion) (\(buildNumber))
+                System: \(systemVersion)
+                Date: \(DateFormatter.localizedString(from: Date(), dateStyle: .full, timeStyle: .full))
 
-            Exception: \(name)
-            Reason: \(reason)
+                Exception: \(name)
+                Reason: \(reason)
 
-            Stack Trace:
-            \(stack)
-            """
+                Stack Trace:
+                \(stack)
+                """
 
             try crashReport.write(to: crashFile, atomically: true, encoding: .utf8)
         } catch {

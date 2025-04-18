@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 // MARK: - Package Info Structure
+
 struct PackageInfo: Identifiable, Hashable {
     var id: String { name }
     let name: String
@@ -21,6 +22,7 @@ struct PackageInfo: Identifiable, Hashable {
 }
 
 // MARK: - Installed Package Info Structure
+
 struct InstalledPackageInfo: Identifiable, Hashable {
     var id: String { name }
     let name: String

@@ -2,6 +2,7 @@ import Foundation
 import ServiceManagement
 
 // MARK: - Login Item Helper
+
 class LoginItemUtility {
     static func setLoginItemEnabled(_ enabled: Bool) {
         if enabled {

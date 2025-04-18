@@ -1,12 +1,12 @@
 import Cocoa
-import SwiftUI
-import UserNotifications
 import ServiceManagement
 import SwiftTerm
+import SwiftUI
+import UserNotifications
 
 // MARK: - AppDelegate
-class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // Managers
     var menuBarManager: MenuBarManager!
     private var terminalWindowController: TerminalWindowController? // For non-interactive output
@@ -41,28 +41,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // Default intervals (in seconds)
     var intervalOptions: [String: TimeInterval] {
-        get {
-            // Combine default intervals with any custom ones
-            var options: [String: TimeInterval] = [
-                "Every Hour": 60 * 60,
-                "Every 6 Hours": 6 * 60 * 60,
-                "Every Day": 24 * 60 * 60,
-                "Every Week": 7 * 24 * 60 * 60,
-                "Manually": 0 // Use 0 for manual checks
-            ]
+        // Combine default intervals with any custom ones
+        var options: [String: TimeInterval] = [
+            "Every Hour": 60 * 60,
+            "Every 6 Hours": 6 * 60 * 60,
+            "Every Day": 24 * 60 * 60,
+            "Every Week": 7 * 24 * 60 * 60,
+            "Manually": 0, // Use 0 for manual checks
+        ]
 
-            // Add any custom intervals from UserDefaults
-            if let customIntervals = UserDefaults.standard.dictionary(forKey: customIntervalsKey) as? [String: TimeInterval] {
-                for (name, interval) in customIntervals {
-                    // Don't override built-in intervals with custom ones
-                    if !options.keys.contains(name) {
-                        options[name] = interval
-                    }
+        // Add any custom intervals from UserDefaults
+        if let customIntervals = UserDefaults.standard.dictionary(forKey: customIntervalsKey) as? [String: TimeInterval] {
+            for (name, interval) in customIntervals {
+                // Don't override built-in intervals with custom ones
+                if !options.keys.contains(name) {
+                    options[name] = interval
                 }
             }
-
-            return options
         }
+
+        return options
     }
 
     // Notification Names
@@ -89,8 +87,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // Start initial data load
         checkForUpdates(displayOutput: false) { [weak self] in
-            guard let self = self else { return }
-            self.refreshInstalledPackages() {
+            guard let self else { return }
+            self.refreshInstalledPackages {
                 self.scheduleUpdateTimer()
                 // Final UI update after all initial loading
                 self.menuBarManager.updateMenu(outdatedPackages: self.currentOutdatedPackages,
@@ -154,7 +152,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
             // Create a new timer starting from now
             updateTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-                guard let self = self else { return }
+                guard let self else { return }
 
                 // Perform log maintenance
                 LoggingUtility.shared.performLogMaintenance()
@@ -201,7 +199,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc func setInterval(_ sender: NSPopUpButton) {
         guard let selectedItem = sender.selectedItem,
-              let interval = selectedItem.representedObject as? TimeInterval else {
+              let interval = selectedItem.representedObject as? TimeInterval
+        else {
             return
         }
 
@@ -266,12 +265,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func showOutdatedPackagesWindow() {
         // Check if window already exists and bring it to front
         if let existingController = outdatedPackagesWindowController,
-           let window = existingController.window {
+           let window = existingController.window
+        {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             // If the menu item was used, post notification to ensure sheet opens
             // (Consider if this is needed or if just bringing window forward is enough)
-             // NotificationCenter.default.post(name: Self.runCheckInSheetNotification, object: nil)
+            // NotificationCenter.default.post(name: Self.runCheckInSheetNotification, object: nil)
             return
         }
 
@@ -317,10 +317,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // Fetch installed packages and update the view asynchronously
         BrewBarManager.shared.fetchInstalledPackages { [weak self, weak viewState] packages in
-             guard let self = self else { return }
-             guard let capturedViewState = viewState else { return }
-             guard let window = self.outdatedPackagesWindowController?.window,
-                   let contentVC = window.contentViewController as? NSHostingController<OutdatedPackagesView> else { return }
+            guard let self else { return }
+            guard let capturedViewState = viewState else { return }
+            guard let window = self.outdatedPackagesWindowController?.window,
+                  let contentVC = window.contentViewController as? NSHostingController<OutdatedPackagesView> else { return }
 
             let updatedView = OutdatedPackagesView(
                 packages: self.currentOutdatedPackages,
@@ -336,6 +336,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     // MARK: - NSWindowDelegate
+
     func windowWillClose(_ notification: Notification) {
         // Only handle closing the packages window now
         if (notification.object as? NSWindow) == outdatedPackagesWindowController?.window {
@@ -348,25 +349,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // Optional: Interrupt process when window closes (TBD)
             // Remove the attempt to interrupt the internal process.
             /*
-            if let hostingController = embeddedTerminalWindowController?.window?.contentViewController as? NSHostingController<SwiftTermView>,
-               let terminalView = hostingController.view as? LocalProcessTerminalView {
-                LoggingUtility.shared.log("Interrupting embedded terminal process on window close.")
-                // terminalView.process?.interrupt() // Don't do this
-            }
-            */
+             if let hostingController = embeddedTerminalWindowController?.window?.contentViewController as? NSHostingController<SwiftTermView>,
+                let terminalView = hostingController.view as? LocalProcessTerminalView {
+                 LoggingUtility.shared.log("Interrupting embedded terminal process on window close.")
+                 // terminalView.process?.interrupt() // Don't do this
+             }
+             */
             embeddedTerminalWindowController = nil // Release the controller reference
 
             // Trigger a refresh check after closing the terminal, as the user likely changed something
             LoggingUtility.shared.log("Triggering background check after embedded terminal closed.")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { // Short delay
-                 self.checkForUpdates(displayOutput: false) { // Run check silently
-                     self.refreshInstalledPackages()
-                 }
+                self.checkForUpdates(displayOutput: false) { // Run check silently
+                    self.refreshInstalledPackages()
+                }
             }
         }
     }
 
     // MARK: - Menu Item Actions (Triggering Sheet via Notifications)
+
     @objc func checkForUpdatesManual() {
         // Rate limiting logic remains the same...
         if let lastCheck = lastCheckTime, Date().timeIntervalSince(lastCheck) < 60 {
@@ -404,6 +406,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     // MARK: - Background Check Logic
+
     func checkForUpdates(displayOutput: Bool = false, runUpdate: Bool = false, completion: (() -> Void)? = nil) {
         // Ignore displayOutput=true branch as it's handled via notifications
         if displayOutput {
@@ -430,8 +433,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             LoggingUtility.shared.log("Running brew update: \(updateCommand.joined(separator: " "))")
 
             // Use the utility method to run the command
-            BrewBarUtility.shared.runBrewCommand(updateCommand) { [weak self] output, exitCode, error in
-                guard let self = self else {
+            BrewBarUtility.shared.runBrewCommand(updateCommand) { [weak self] _, exitCode, error in
+                guard let self else {
                     completion?()
                     return
                 }
@@ -455,7 +458,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func checkForOutdatedPackages(completion: (() -> Void)? = nil) {
         // Run the outdated command
         BrewBarUtility.shared.runBrewCommand(["outdated", "--verbose"]) { [weak self] output, exitCode, error in
-            guard let self = self else {
+            guard let self else {
                 DispatchQueue.main.async { completion?() }
                 return
             }
@@ -464,7 +467,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self.lastCheckTime = Date()
                 self.menuBarManager.updateCheckNowMenuItemTitle()
 
-                if let error = error {
+                if let error {
                     LoggingUtility.shared.log("Error checking for outdated packages: \(error.localizedDescription)")
                     self.lastCheckError = true
                     self.menuBarManager.updateMenu(outdatedPackages: [], checking: false, errorOccurred: true)
@@ -477,7 +480,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 let encounteredError: Bool
 
                 if exitCode == 0 {
-                    if let output = output {
+                    if let output {
                         packages = BrewBarManager.shared.parsePackagesWithVersions(from: output)
                         LoggingUtility.shared.log("Background check found \(packages.count) outdated packages")
                         let currentCount = packages.count
@@ -503,15 +506,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
                 // Enrich the packages with additional information
                 BrewBarManager.shared.enrichOutdatedPackagesWithSource(packages: packages) { [weak self] enrichedPackages in
-                    guard let self = self else {
+                    guard let self else {
                         DispatchQueue.main.async { completion?() }
                         return
                     }
 
                     self.currentOutdatedPackages = enrichedPackages
                     self.menuBarManager.updateMenu(outdatedPackages: enrichedPackages,
-                                               checking: false,
-                                               errorOccurred: encounteredError)
+                                                   checking: false,
+                                                   errorOccurred: encounteredError)
 
                     // Re-enable menu items if needed
                     if let showOutdatedItem = self.menuBarManager.menu?.item(withTitle: "View Packages...") {
@@ -525,6 +528,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     // MARK: - State Update Helpers
+
     func updateMenuWithError() {
         lastCheckError = true
         menuBarManager.updateMenu(errorOccurred: true)
@@ -539,7 +543,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func refreshInstalledPackages(completion: (() -> Void)? = nil) {
         LoggingUtility.shared.log("Fetching installed packages")
         BrewBarManager.shared.fetchInstalledPackages { [weak self] packages in
-            guard let self = self else { return }
+            guard let self else { return }
             self.currentInstalledPackages = packages
             LoggingUtility.shared.log("Found \(packages.count) installed packages")
             completion?()
@@ -550,7 +554,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func refreshPackagesWindow(viewState: PackageViewState? = nil) {
         guard let windowController = outdatedPackagesWindowController,
               let window = windowController.window,
-              let contentVC = window.contentViewController as? NSHostingController<OutdatedPackagesView> else {
+              let contentVC = window.contentViewController as? NSHostingController<OutdatedPackagesView>
+        else {
             // Window is likely closed, nothing to refresh
             return
         }
@@ -566,8 +571,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             viewState: currentViewState, // Use the determined state
             // Only pass required callback
             refreshDataAfterTask: { [weak self] commandArgs, exitCode in
-                 self?.handleTaskCompletion(commandArgs: commandArgs, exitCode: exitCode)
-             }
+                self?.handleTaskCompletion(commandArgs: commandArgs, exitCode: exitCode)
+            }
         )
 
         // Update the content view
@@ -576,7 +581,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // Handles completion of tasks run in the sheet, performs optimistic UI updates.
     private func handleTaskCompletion(commandArgs: [String], exitCode: Int32?) {
-        guard let exitCode = exitCode else {
+        guard let exitCode else {
             LoggingUtility.shared.log("Task completed with no exit code (terminated via signal?). Triggering full refresh.")
             triggerFullBackgroundRefresh()
             return
@@ -624,9 +629,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
             // Perform optimistic refresh if flag is set
             if needsOptimisticRefresh {
-                 DispatchQueue.main.async {
-                     self.refreshPackagesWindow()
-                 }
+                DispatchQueue.main.async {
+                    self.refreshPackagesWindow()
+                }
             }
 
             // Check for app update *after* upgrade-all refresh is triggered
@@ -638,17 +643,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // Command failed
             LoggingUtility.shared.log("Task \(commandArgs.joined(separator: " ")) failed with exit code \(exitCode). Triggering full refresh.")
             // Trigger full refresh on failure to ensure UI consistency
-             triggerFullBackgroundRefresh()
+            triggerFullBackgroundRefresh()
         }
 
         // Ensure UI is always updated
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            guard let self = self else { return }
+            guard let self else { return }
 
             self.checkForUpdates(displayOutput: false) { [weak self] in
-                guard let self = self else { return }
+                guard let self else { return }
 
-                self.refreshInstalledPackages() {
+                self.refreshInstalledPackages {
                     // Force refresh UI after data updates
                     self.refreshPackagesWindow()
 
@@ -657,8 +662,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
                     // Then update the menu
                     self.menuBarManager.updateMenu(outdatedPackages: self.currentOutdatedPackages,
-                                                checking: false,
-                                                errorOccurred: self.lastCheckError)
+                                                   checking: false,
+                                                   errorOccurred: self.lastCheckError)
                 }
             }
         }
@@ -684,9 +689,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Use `brew list --versions <bundleId>` to get the currently installed version
         // Example assumes bundleId is the correct formula/cask name for brew
         BrewBarUtility.shared.runBrewCommand(["list", "--versions", bundleId]) { [weak self] output, exitCode, error in
-            guard let self = self else { return }
+            guard let self else { return }
 
-            guard exitCode == 0, let output = output, error == nil else {
+            guard exitCode == 0, let output, error == nil else {
                 LoggingUtility.shared.log("Failed to get current version for \(bundleId) via brew. Error: \(error?.localizedDescription ?? "Exit code \(exitCode)"), Output: \(output ?? "N/A")")
                 return
             }
@@ -704,7 +709,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     LoggingUtility.shared.log("App (\(bundleId)) version (\(initialVersion)) hasn't changed.")
                 }
             } else {
-                 LoggingUtility.shared.log("Could not parse version from brew output: \(output)")
+                LoggingUtility.shared.log("Could not parse version from brew output: \(output)")
             }
         }
     }
@@ -755,6 +760,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     // MARK: - Preferences & Other Actions
+
     @objc func showPreferences() {
         if preferencesWindowController == nil {
             preferencesWindowController = PreferencesWindowController(appDelegate: self)

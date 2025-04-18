@@ -1,5 +1,5 @@
 //
-//  BrewBarUITestsLaunchTests.swift
+//  HomebrewMenubarUITestsLaunchTests.swift
 //  BrewBarUITests
 //
 //  Created by Josh Beard on 4/11/25.
@@ -8,7 +8,6 @@
 import XCTest
 
 final class BrewBarUITestsLaunchTests: XCTestCase {
-
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true
     }

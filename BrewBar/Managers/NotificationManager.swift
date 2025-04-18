@@ -2,6 +2,7 @@ import Foundation
 import UserNotifications
 
 // MARK: - Notification Manager
+
 class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationManager()
 
@@ -45,7 +46,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         center.setNotificationCategories([updateCategory])
 
         // Request permission to show notifications
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
             if granted {
                 LoggingUtility.shared.log("Notification permission granted.")
                 self.notificationsAuthorized = true
@@ -99,7 +100,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
         // Add the request to the notification center
         UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
+            if let error {
                 LoggingUtility.shared.log("Error sending notification: \(error.localizedDescription)")
                 self.notificationsAuthorized = false // Disable future attempts if this fails
             } else {
@@ -110,8 +111,9 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
     // UNUserNotificationCenterDelegate method
     func userNotificationCenter(_ center: UNUserNotificationCenter,
-                               didReceive response: UNNotificationResponse,
-                               withCompletionHandler completionHandler: @escaping () -> Void) {
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void)
+    {
         // When user clicks on the notification, show the outdated packages window
         NotificationCenter.default.post(name: NSNotification.Name("ShowOutdatedPackagesWindow"), object: nil)
         completionHandler()

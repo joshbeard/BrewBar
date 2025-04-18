@@ -1,6 +1,6 @@
+import Combine
 import Foundation
 import SwiftUI
-import Combine
 
 // Notification Name for triggering check from menu
 extension Notification.Name {
@@ -14,13 +14,14 @@ class PackageViewState: ObservableObject {
     @Published var isCheckingForUpdates: Bool = false
     // Add state for the embedded terminal
     @Published var showTerminalSheet: Bool = false
-    @Published var terminalArgs: [String]? = nil
+    @Published var terminalArgs: [String]?
     @Published var terminalTitle: String = "Terminal"
     @Published var terminalKey: UUID = UUID()
     @Published var isTerminalProcessRunning: Bool = false
 }
 
 // MARK: - SwiftUI View for Homebrew Packages
+
 struct OutdatedPackagesView: View {
     let packagesInfo: [PackageInfo]
     let installedPackages: [InstalledPackageInfo]
@@ -41,7 +42,8 @@ struct OutdatedPackagesView: View {
          installed: [InstalledPackageInfo],
          errorOccurred: Bool = false,
          viewState: PackageViewState, // Pass the initial state
-         refreshDataAfterTask: @escaping (_ commandArgs: [String], _ exitCode: Int32?) -> Void) {
+         refreshDataAfterTask: @escaping (_ commandArgs: [String], _ exitCode: Int32?) -> Void)
+    {
         self.packagesInfo = packages
         self.installedPackages = installed
         self.errorOccurred = errorOccurred
@@ -143,8 +145,8 @@ struct OutdatedPackagesView: View {
                                       self.refreshDataAfterTask(commandArgs, exitCode)
                                       viewState.isTerminalProcessRunning = false
                                   })
-                        .id(viewState.terminalKey) // Force recreation when key changes
-                        .frame(minWidth: 600, minHeight: 400) // Size for the sheet
+                                  .id(viewState.terminalKey) // Force recreation when key changes
+                                  .frame(minWidth: 600, minHeight: 400) // Size for the sheet
 
                     Button("Close") {
                         if viewState.isTerminalProcessRunning {
@@ -504,7 +506,7 @@ struct OutdatedPackagesView: View {
         } else {
             return packagesInfo.filter {
                 $0.name.localizedCaseInsensitiveContains(searchText) ||
-                $0.source.localizedCaseInsensitiveContains(searchText)
+                    $0.source.localizedCaseInsensitiveContains(searchText)
             }
         }
     }
@@ -515,8 +517,8 @@ struct OutdatedPackagesView: View {
         } else {
             return installedPackages.filter {
                 $0.name.localizedCaseInsensitiveContains(searchText) ||
-                $0.source.localizedCaseInsensitiveContains(searchText) ||
-                $0.version.localizedCaseInsensitiveContains(searchText)
+                    $0.source.localizedCaseInsensitiveContains(searchText) ||
+                    $0.version.localizedCaseInsensitiveContains(searchText)
             }
         }
     }
