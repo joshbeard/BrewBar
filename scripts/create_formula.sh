@@ -16,21 +16,19 @@ echo "  ZIP_PATH=$ZIP_PATH"
 echo "  FORMULA_PATH=$FORMULA_PATH"
 echo "  REPO=$REPO"
 
-# Validate version
+# Validate inputs
 if [ -z "$VERSION" ]; then
     echo "Error: Version is required"
     echo "Usage: $0 <version> <zip_path> [formula_path]"
     exit 1
 fi
 
-# Validate ZIP path
 if [ -z "$ZIP_PATH" ]; then
     echo "Error: ZIP path is required"
     echo "Usage: $0 <version> <zip_path> [formula_path]"
     exit 1
 fi
 
-# Check if ZIP file exists
 if [ ! -f "$ZIP_PATH" ]; then
     echo "Error: ZIP file not found at: $ZIP_PATH"
     echo "Current directory: $(pwd)"
@@ -61,29 +59,30 @@ cask "brewbar" do
 
   app "BrewBar.app"
 
-  # Remove quarantine attribute
-  postflight do
-    system "xattr", "-d", "com.apple.quarantine", "#{appdir}/BrewBar.app"
-  rescue
-    # In case xattr command fails (which can happen if the attribute doesn't exist)
-    nil
+  # Ensure permissions before uninstall
+  uninstall_preflight do
+    if File.exist?("#{appdir}/BrewBar.app")
+      system_command "chown", args: ["-R", "#{ENV['USER']}:admin", "#{appdir}/BrewBar.app"]
+      system_command "chmod", args: ["-R", "u+rw", "#{appdir}/BrewBar.app"]
+    end
   end
 
-  # Restart app after update
-  postflight do
-    set_ownership "#{appdir}/BrewBar.app"
+  # Ensure permissions before install
+  preflight do
+    system_command "chown", args: ["#{ENV['USER']}:admin", "#{appdir}"]
+    system_command "chmod", args: ["u+rw", "#{appdir}"]
+  end
 
-    # Restart the app if it was running
-    if system "pgrep", "-x", "BrewBar"
-      system_command "pkill", args: ["-x", "BrewBar"]
-      sleep 1
-      system_command "open", args: ["#{appdir}/BrewBar.app"]
-    end
+  # Remove quarantine attribute
+  postflight do
+    system_command "xattr", args: ["-d", "com.apple.quarantine", "#{appdir}/BrewBar.app"]
+  rescue
+    nil
   end
 
   uninstall quit:      "me.joshbeard.BrewBar",
             launchctl: "me.joshbeard.BrewBar",
-            trash:    "#{appdir}/BrewBar.app"
+            delete:    "#{appdir}/BrewBar.app"
 
   zap trash: [
     "~/Library/Application Support/BrewBar",
