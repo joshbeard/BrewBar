@@ -171,17 +171,31 @@ class MenuBarManager {
             }
 
             if let nextCheckTime = self.appDelegate?.nextScheduledCheckTime {
-                // Format the next check time
-                let formatter = DateFormatter()
-                formatter.dateStyle = .none
-                formatter.timeStyle = .short
-                let timeString = formatter.string(from: nextCheckTime)
-
                 // Calculate how much time until next check
                 let interval = nextCheckTime.timeIntervalSinceNow
-                let timeUntil = self.formatTimeInterval(interval)
 
-                nextScheduledCheckMenuItem.title = "Next check: \(timeString) (\(timeUntil))"
+                // Check if next check time is in the past
+                if interval <= 0 {
+                    nextScheduledCheckMenuItem.title = "Next check: Checking soon..."
+
+                    // Notify app delegate that it's time to reschedule the timer
+                    if let appDelegate = self.appDelegate {
+                        DispatchQueue.main.async {
+                            appDelegate.scheduleUpdateTimer() // This will recalculate next check time
+                        }
+                    }
+                } else {
+                    // Format the next check time
+                    let formatter = DateFormatter()
+                    formatter.dateStyle = .none
+                    formatter.timeStyle = .short
+                    let timeString = formatter.string(from: nextCheckTime)
+
+                    // Format the time until next check
+                    let timeUntil = self.formatTimeInterval(interval)
+
+                    nextScheduledCheckMenuItem.title = "Next check: \(timeString) (\(timeUntil))"
+                }
             } else {
                 nextScheduledCheckMenuItem.title = "Next check: Manual only"
             }

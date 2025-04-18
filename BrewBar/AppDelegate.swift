@@ -137,11 +137,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let interval = getCurrentInterval()
 
         if interval > 0 {
-            updateTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-                self?.checkForUpdates()
-            }
+            // Calculate next check time - always use current time as base
             let nextCheck = Date().addingTimeInterval(interval)
             nextScheduledCheckTime = nextCheck
+
+            // Create a new timer starting from now
+            updateTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+                guard let self = self else { return }
+
+                // Always run update on scheduled checks
+                self.checkForUpdates(runUpdate: true) {
+                    // Reschedule timer after check is complete to ensure next time is always in the future
+                    self.scheduleUpdateTimer()
+                }
+            }
+
             LoggingUtility.shared.log("Scheduled update check every \(interval) seconds. Next check at \(formatDate(nextCheck))")
             menuBarManager.updateNextCheckMenuItem()
             // Call updateMenu after scheduling to ensure consistency
@@ -358,7 +368,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // 2. Post notification to tell the window to show the check in its sheet
         // Needs a slight delay to ensure window is ready to receive if just created
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            NotificationCenter.default.post(name: Self.runCheckInSheetNotification, object: nil)
+            // Always run brew update first for manual checks
+            NotificationCenter.default.post(name: Self.runUpdateInSheetNotification, object: nil)
         }
     }
 
@@ -379,7 +390,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     // MARK: - Background Check Logic
-    func checkForUpdates(displayOutput: Bool = false, completion: (() -> Void)? = nil) {
+    func checkForUpdates(displayOutput: Bool = false, runUpdate: Bool = false, completion: (() -> Void)? = nil) {
         // Ignore displayOutput=true branch as it's handled via notifications
         if displayOutput {
             LoggingUtility.shared.log("Warning: checkForUpdates(displayOutput: true) called directly. Manual checks should use checkForUpdatesManual().")
@@ -396,107 +407,106 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         lastCheckError = false
         menuBarManager.updateMenu(checking: true) // Update UI to show checking
-        // ... (disable menu item) ...
         LoggingUtility.shared.log("Starting background check...")
 
-        guard BrewBarUtility.shared.brewPath != nil else {
-            LoggingUtility.shared.log("ERROR: Brew executable not found")
-            DispatchQueue.main.async {
-                self.lastCheckTime = Date()
-                self.menuBarManager.updateCheckNowMenuItemTitle()
-                self.updateMenuWithError()
+        // If running update first, do that, then check outdated packages
+        if runUpdate {
+            // Use BrewBarManager's update command
+            let updateCommand = BrewBarManager.shared.updateCommand
+            LoggingUtility.shared.log("Running brew update: \(updateCommand.joined(separator: " "))")
 
-                if let showOutdatedItem = self.menuBarManager.menu?.item(withTitle: "View Packages...") {
-                    showOutdatedItem.isEnabled = true // Re-enable on error
-                }
-                completion?() // Call completion even on error
-            }
-            return
-        }
-
-        // Safely unwrap here since we guarded against nil above
-        let brewExecutable = BrewBarUtility.shared.brewPath!
-
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: brewExecutable)
-        task.arguments = ["outdated", "--verbose"]
-
-        // Setup pipes for output and error
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        task.standardOutput = outputPipe
-        task.standardError = errorPipe
-
-        // Set environment variables to prevent interactive prompts from Homebrew
-        var environment = ProcessInfo.processInfo.environment
-        environment["HOMEBREW_NO_AUTO_UPDATE"] = "1"
-        environment["HOMEBREW_NO_INSTALL_UPGRADE"] = "1"
-        environment["HOMEBREW_NO_ANALYTICS"] = "1"
-        environment["HOMEBREW_NO_EMOJI"] = "1"
-        task.environment = environment
-
-        BrewBarManager.shared.updateCheckTask = task
-
-        do {
-            // Construct command string safely for logging
-            let commandString = "brew \((task.arguments ?? []).joined(separator: " "))"
-            try task.run()
-            // Log *after* successful start, using the commandString variable
-            LoggingUtility.shared.log("Started background command: \(commandString)")
-
-            task.terminationHandler = { [weak self] process in
-                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-
+            // Use the utility method to run the command
+            BrewBarUtility.shared.runBrewCommand(updateCommand) { [weak self] output, exitCode, error in
                 guard let self = self else {
-                    DispatchQueue.main.async { completion?() }
+                    completion?()
                     return
                 }
 
-                DispatchQueue.main.async {
-                    let output = String(data: outputData, encoding: .utf8) ?? ""
-                    let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+                if error != nil || exitCode != 0 {
+                    LoggingUtility.shared.log("Brew update failed with error: \(error?.localizedDescription ?? "Exit code: \(exitCode)")")
+                } else {
+                    LoggingUtility.shared.log("Brew update completed successfully")
+                }
 
-                    BrewBarManager.shared.updateCheckTask = nil
-                    self.lastCheckTime = Date()
-                    self.menuBarManager.updateCheckNowMenuItemTitle()
-                    // ... (recalculate next check time and update specific menu item) ...
+                // Proceed to check for outdated packages regardless of update success
+                self.checkForOutdatedPackages(completion: completion)
+            }
+        } else {
+            // Just check for outdated packages directly
+            checkForOutdatedPackages(completion: completion)
+        }
+    }
 
-                    let packages: [PackageInfo]
-                    let encounteredError: Bool
+    // Helper method to check for outdated packages
+    private func checkForOutdatedPackages(completion: (() -> Void)? = nil) {
+        // Run the outdated command
+        BrewBarUtility.shared.runBrewCommand(["outdated", "--verbose"]) { [weak self] output, exitCode, error in
+            guard let self = self else {
+                DispatchQueue.main.async { completion?() }
+                return
+            }
 
-                    if process.terminationStatus == 0 {
+            DispatchQueue.main.async {
+                self.lastCheckTime = Date()
+                self.menuBarManager.updateCheckNowMenuItemTitle()
+
+                if let error = error {
+                    LoggingUtility.shared.log("Error checking for outdated packages: \(error.localizedDescription)")
+                    self.lastCheckError = true
+                    self.menuBarManager.updateMenu(outdatedPackages: [], checking: false, errorOccurred: true)
+                    completion?()
+                    return
+                }
+
+                // Process the output to find outdated packages
+                let packages: [PackageInfo]
+                let encounteredError: Bool
+
+                if exitCode == 0 {
+                    if let output = output {
                         packages = BrewBarManager.shared.parsePackagesWithVersions(from: output)
                         LoggingUtility.shared.log("Background check found \(packages.count) outdated packages")
                         let currentCount = packages.count
-                        if currentCount > 0 && self.lastOutdatedCount == 0 { NotificationManager.shared.sendNotification(count: currentCount) }
+                        if currentCount > 0 && self.lastOutdatedCount == 0 {
+                            NotificationManager.shared.sendNotification(count: currentCount)
+                        }
                         self.lastOutdatedCount = currentCount
                         self.lastCheckError = false
-                        encounteredError = false // Assign within the if block
+                        encounteredError = false
                     } else {
-                        let logMessage = "Error in background check (status \(process.terminationStatus)): \(errorOutput.isEmpty ? output : errorOutput)"
-                        LoggingUtility.shared.log(logMessage)
-                        packages = [] // Assign empty array on error
-                        encounteredError = true // Assign within the else block
+                        LoggingUtility.shared.log("No output from outdated command despite success code")
+                        packages = []
+                        encounteredError = true
                         self.lastCheckError = true
                     }
+                } else {
+                    let logMessage = "Error in background check (status \(exitCode)): \(output ?? "No output")"
+                    LoggingUtility.shared.log(logMessage)
+                    packages = []
+                    encounteredError = true
+                    self.lastCheckError = true
+                }
 
-                    BrewBarManager.shared.enrichOutdatedPackagesWithSource(packages: packages) { [weak self] enrichedPackages in
-                        guard let self = self else {
-                             DispatchQueue.main.async { completion?() }
-                            return
-                        }
-                        self.currentOutdatedPackages = enrichedPackages
-                        // Final menu update after enrichment
-                        self.menuBarManager.updateMenu(outdatedPackages: enrichedPackages, checking: false, errorOccurred: encounteredError)
-                        // ... (re-enable menu item) ...
-                        completion?() // Call completion *after* all processing
+                // Enrich the packages with additional information
+                BrewBarManager.shared.enrichOutdatedPackagesWithSource(packages: packages) { [weak self] enrichedPackages in
+                    guard let self = self else {
+                        DispatchQueue.main.async { completion?() }
+                        return
                     }
+
+                    self.currentOutdatedPackages = enrichedPackages
+                    self.menuBarManager.updateMenu(outdatedPackages: enrichedPackages,
+                                               checking: false,
+                                               errorOccurred: encounteredError)
+
+                    // Re-enable menu items if needed
+                    if let showOutdatedItem = self.menuBarManager.menu?.item(withTitle: "View Packages...") {
+                        showOutdatedItem.isEnabled = true
+                    }
+
+                    completion?()
                 }
             }
-        } catch {
-            // ... (error handling for task.run) ...
-            DispatchQueue.main.async { completion?() }
         }
     }
 
@@ -606,13 +616,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // Ensure UI is always updated
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.checkForUpdates(displayOutput: false) { [weak self] in
-                self?.refreshInstalledPackages() {
+            guard let self = self else { return }
+
+            self.checkForUpdates(displayOutput: false) { [weak self] in
+                guard let self = self else { return }
+
+                self.refreshInstalledPackages() {
                     // Force refresh UI after data updates
-                    self?.refreshPackagesWindow()
-                    self?.menuBarManager.updateMenu(outdatedPackages: self?.currentOutdatedPackages ?? [],
-                                                  checking: false,
-                                                  errorOccurred: self?.lastCheckError ?? false)
+                    self.refreshPackagesWindow()
+
+                    // Important: Reschedule the timer to ensure next check time is updated
+                    self.scheduleUpdateTimer()
+
+                    // Then update the menu
+                    self.menuBarManager.updateMenu(outdatedPackages: self.currentOutdatedPackages,
+                                                checking: false,
+                                                errorOccurred: self.lastCheckError)
                 }
             }
         }

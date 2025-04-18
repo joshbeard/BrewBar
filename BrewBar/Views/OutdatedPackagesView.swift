@@ -210,8 +210,9 @@ struct OutdatedPackagesView: View {
                         .foregroundColor(.secondary)
 
                     Button("Check for Updates") {
-                        viewState.terminalArgs = ["outdated", "--verbose"]
-                        viewState.terminalTitle = "Checking for Outdated Packages..."
+                        // Run update first to ensure the Homebrew database is refreshed
+                        viewState.terminalArgs = BrewBarManager.shared.updateCommand
+                        viewState.terminalTitle = "Updating Homebrew Database..."
                         viewState.terminalKey = UUID()
                         viewState.showTerminalSheet = true
                     }
@@ -267,8 +268,9 @@ struct OutdatedPackagesView: View {
                         Spacer()
 
                         Button("Check for Updates") {
-                            viewState.terminalArgs = ["outdated", "--verbose"]
-                            viewState.terminalTitle = "Checking for Outdated Packages..."
+                            // Run update first to ensure the Homebrew database is refreshed
+                            viewState.terminalArgs = BrewBarManager.shared.updateCommand
+                            viewState.terminalTitle = "Updating Homebrew Database..."
                             viewState.terminalKey = UUID()
                             viewState.showTerminalSheet = true
                         }
