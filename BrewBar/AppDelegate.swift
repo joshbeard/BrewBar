@@ -91,6 +91,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         }
 
+        // Perform log maintenance
+        LoggingUtility.shared.performLogMaintenance()
+
         // Register for notifications
         NotificationCenter.default.addObserver(
             self,
@@ -144,6 +147,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // Create a new timer starting from now
             updateTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
                 guard let self = self else { return }
+
+                // Perform log maintenance
+                LoggingUtility.shared.performLogMaintenance()
 
                 // Always run update on scheduled checks
                 self.checkForUpdates(runUpdate: true) {

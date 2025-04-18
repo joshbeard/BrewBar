@@ -4,6 +4,9 @@ import Foundation
 class LoggingUtility {
     static let shared = LoggingUtility()
 
+    // Number of days to keep logs
+    private let logRetentionDays = 5
+
     static var logDirectoryURL: URL {
         let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupportURL.appendingPathComponent("BrewBar/Logs", isDirectory: true)
@@ -81,6 +84,52 @@ class LoggingUtility {
             }
         } catch {
             print("Failed to write to log file: \(error)")
+        }
+    }
+
+    func performLogMaintenance() {
+        cleanupOldLogs()
+    }
+
+    func cleanupOldLogs() {
+        let fileManager = FileManager.default
+        let logsDir = Self.logDirectoryURL
+
+        // Get the cutoff date (5 days ago)
+        let calendar = Calendar.current
+        guard let cutoffDate = calendar.date(byAdding: .day, value: -logRetentionDays, to: Date()) else {
+            print("Failed to calculate cutoff date")
+            return
+        }
+
+        do {
+            // Get all log files in the directory
+            let logFiles = try fileManager.contentsOfDirectory(at: logsDir, includingPropertiesForKeys: nil)
+
+            // Date formatter to parse dates from filenames
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+
+            for fileURL in logFiles {
+                // Extract date from filename (format: brewbar-YYYY-MM-DD.log)
+                let filename = fileURL.lastPathComponent
+                guard filename.hasPrefix("brewbar-"),
+                      filename.hasSuffix(".log") else {
+                    continue
+                }
+
+                let dateString = filename.replacingOccurrences(of: "brewbar-", with: "").replacingOccurrences(of: ".log", with: "")
+                guard let fileDate = formatter.date(from: dateString) else {
+                    continue
+                }
+
+                if fileDate < cutoffDate {
+                    try fileManager.removeItem(at: fileURL)
+                    print("Deleted old log file: \(filename)")
+                }
+            }
+        } catch {
+            print("Error cleaning up log files: \(error)")
         }
     }
 }
