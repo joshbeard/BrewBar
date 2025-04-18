@@ -17,6 +17,7 @@ class PackageViewState: ObservableObject {
     @Published var terminalArgs: [String]? = nil
     @Published var terminalTitle: String = "Terminal"
     @Published var terminalKey: UUID = UUID()
+    @Published var isTerminalProcessRunning: Bool = false
 }
 
 // MARK: - SwiftUI View for Homebrew Packages
@@ -139,14 +140,18 @@ struct OutdatedPackagesView: View {
                     SwiftTermView(executablePath: brewExecutablePath,
                                   arguments: args,
                                   onProcessEnd: { commandArgs, exitCode in
-                                      // Trigger data refresh after task completion
                                       self.refreshDataAfterTask(commandArgs, exitCode)
+                                      viewState.isTerminalProcessRunning = false
                                   })
                         .id(viewState.terminalKey) // Force recreation when key changes
                         .frame(minWidth: 600, minHeight: 400) // Size for the sheet
 
                     Button("Close") {
-                        viewState.showTerminalSheet = false
+                        if viewState.isTerminalProcessRunning {
+                            showCloseConfirmationAlert()
+                        } else {
+                            viewState.showTerminalSheet = false
+                        }
                     }
                     .padding()
                 }
@@ -171,6 +176,7 @@ struct OutdatedPackagesView: View {
         viewState.terminalArgs = ["outdated", "--verbose"]
         viewState.terminalTitle = "Checking for Outdated Packages..."
         viewState.terminalKey = UUID()
+        viewState.isTerminalProcessRunning = true
         viewState.showTerminalSheet = true
     }
 
@@ -180,6 +186,7 @@ struct OutdatedPackagesView: View {
         viewState.terminalArgs = command
         viewState.terminalTitle = "Updating Homebrew..."
         viewState.terminalKey = UUID()
+        viewState.isTerminalProcessRunning = true
         viewState.showTerminalSheet = true
     }
 
@@ -189,6 +196,7 @@ struct OutdatedPackagesView: View {
         viewState.terminalArgs = command
         viewState.terminalTitle = "Upgrading All Packages..."
         viewState.terminalKey = UUID()
+        viewState.isTerminalProcessRunning = true
         viewState.showTerminalSheet = true
     }
 
@@ -214,6 +222,7 @@ struct OutdatedPackagesView: View {
                         viewState.terminalArgs = BrewBarManager.shared.updateCommand
                         viewState.terminalTitle = "Updating Homebrew Database..."
                         viewState.terminalKey = UUID()
+                        viewState.isTerminalProcessRunning = true
                         viewState.showTerminalSheet = true
                     }
                     .padding(.top, 10)
@@ -272,6 +281,7 @@ struct OutdatedPackagesView: View {
                             viewState.terminalArgs = BrewBarManager.shared.updateCommand
                             viewState.terminalTitle = "Updating Homebrew Database..."
                             viewState.terminalKey = UUID()
+                            viewState.isTerminalProcessRunning = true
                             viewState.showTerminalSheet = true
                         }
                         .disabled(viewState.isCheckingForUpdates)
@@ -282,6 +292,7 @@ struct OutdatedPackagesView: View {
                                 viewState.terminalArgs = ["upgrade"] + packageNames
                                 viewState.terminalTitle = "Upgrading Selected..."
                                 viewState.terminalKey = UUID()
+                                viewState.isTerminalProcessRunning = true
                                 viewState.showTerminalSheet = true
                             }
                         }
@@ -292,6 +303,7 @@ struct OutdatedPackagesView: View {
                             viewState.terminalArgs = command
                             viewState.terminalTitle = "Upgrading All Packages..."
                             viewState.terminalKey = UUID()
+                            viewState.isTerminalProcessRunning = true
                             viewState.showTerminalSheet = true
                         }
                         .buttonStyle(.borderedProminent)
@@ -357,6 +369,7 @@ struct OutdatedPackagesView: View {
                                             viewState.terminalArgs = ["upgrade", package.name]
                                             viewState.terminalTitle = "Upgrading \(package.name)..."
                                             viewState.terminalKey = UUID()
+                                            viewState.isTerminalProcessRunning = true
                                             viewState.showTerminalSheet = true
                                         }) {
                                             Image(systemName: "arrow.up.circle")
@@ -373,6 +386,7 @@ struct OutdatedPackagesView: View {
                                             viewState.terminalArgs = args
                                             viewState.terminalTitle = "Uninstalling \(package.name)..."
                                             viewState.terminalKey = UUID()
+                                            viewState.isTerminalProcessRunning = true
                                             viewState.showTerminalSheet = true
                                         }) {
                                             Image(systemName: "trash")
@@ -461,6 +475,7 @@ struct OutdatedPackagesView: View {
                                     viewState.terminalArgs = args
                                     viewState.terminalTitle = "Uninstalling \(firstPackageName)..."
                                     viewState.terminalKey = UUID()
+                                    viewState.isTerminalProcessRunning = true
                                     viewState.showTerminalSheet = true
                                 }
                             }
@@ -580,6 +595,7 @@ struct OutdatedPackagesView: View {
                                 viewState.terminalArgs = args
                                 viewState.terminalTitle = "Uninstalling \(package.name)..."
                                 viewState.terminalKey = UUID()
+                                viewState.isTerminalProcessRunning = true
                                 viewState.showTerminalSheet = true
                             }) {
                                 Image(systemName: "trash")
@@ -596,6 +612,30 @@ struct OutdatedPackagesView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Alert Handling
+
+    private func showCloseConfirmationAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Task Still Running"
+        alert.informativeText = "Closing this window will stop the current Homebrew task. Are you sure you want to close it?"
+        alert.addButton(withTitle: "Close Anyway") // Destructive action
+        alert.addButton(withTitle: "Cancel")       // Safe action
+        alert.alertStyle = .warning
+
+        // Present the alert modally
+        let response = alert.runModal()
+
+        if response == .alertFirstButtonReturn { // Corresponds to "Close Anyway"
+            // User confirmed, close the sheet
+            // Note: Closing the sheet/window should implicitly handle process termination
+            // as observed in the AppDelegate's windowWillClose logic.
+            viewState.showTerminalSheet = false
+            // Explicitly mark as not running, although onProcessEnd should also do this.
+            viewState.isTerminalProcessRunning = false
+        }
+        // If "Cancel" is clicked, do nothing.
     }
 }
 
