@@ -2,6 +2,14 @@
 
 All notable changes to BrewBar will be documented in this file.
 
+## 0.0.11 - 2025-04-17
+
+- fix: refresh outdated packages table after update
+
+## 0.0.10 - 2025-04-16
+
+- Refactored package table view
+
 ## 0.0.9 - 2025-04-16
 
 - Use [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) for an embedded terminal emulator for running Homewbrew commands
