@@ -2,6 +2,14 @@
 
 All notable changes to BrewBar will be documented in this file.
 
+## 0.0.16 - 2025-04-17
+
+- yet another brew cask fix
+
+## 0.0.15 - 2025-04-17
+
+- ci updates
+
 ## 0.0.14 - 2025-04-17
 
 - another brew cask fix
