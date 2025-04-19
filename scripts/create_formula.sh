@@ -32,7 +32,7 @@ fi
 if [ ! -f "$ZIP_PATH" ]; then
     echo "Error: ZIP file not found at: $ZIP_PATH"
     echo "Current directory: $(pwd)"
-    echo "Contents of directory: $(ls -la $(dirname "$ZIP_PATH"))"
+    echo "Contents of directory: $(ls -la "$(dirname "$ZIP_PATH")")"
     exit 1
 fi
 
