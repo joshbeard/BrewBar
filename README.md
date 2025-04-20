@@ -36,6 +36,9 @@ you define.
 
   <img src=".github/readme/optimized/4.png" alt="Running an upgrade" width="400"/>
   <p><em>Running an upgrade of all packages</em></p>
+
+  <img src=".github/readme/optimized/5.png" alt="All packages are up to date" width="400"/>
+  <p><em>All packages are up to date</em></p>
 </div>
 
 ## Installation
