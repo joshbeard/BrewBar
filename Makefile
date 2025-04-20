@@ -101,6 +101,6 @@ optimize-images:
 	@find "$(OPTIMIZE_SRC)" -maxdepth 1 \( -name '*.jpg' -o -name '*.jpeg' -o -name '*.png' -o -name '*.gif' \) -print0 | while IFS= read -r -d $$'\0' file; do \
 		filename=$$(basename "$$file"); \
 		echo "  Optimizing $$filename..."; \
-		convert "$$file" -strip -quality 85 "$(OPTIMIZE_DEST)/$$filename"; \
+		convert "$$file" -strip -resize "400x>" -quality 85 "$(OPTIMIZE_DEST)/$$filename"; \
 	done
 	@echo "Image optimization complete."
