@@ -4,13 +4,9 @@ A simple menu bar app for macOS that monitors your Homebrew packages for
 updates. It sits in your menu bar and checks for outdated packages on a schedule
 you define.
 
-> [!WARNING]
-> **Early Development**
->
-> This is a 0.x.x release under very active development from a maintainer with
-> little Swift/SwiftUI experience.
->
-> Beware that it will have bugs and it might not work.
+> [!NOTE]
+> BrewBar is a small personal project. It is usable, but it is not notarized by
+> Apple and is still evolving.
 
 ## Features
 
@@ -18,9 +14,9 @@ you define.
 - 🔔 Notifications when updates are available
 - 🖱️ Selective package updates - choose which packages to upgrade
 - 🚀 One-click updates for individual packages or all at once
-- ⚙️ Customizable update intervals, including user-defined schedules
-- 📋 Browse and remove installed packages
-- 💻 Embedded terminal emulator using [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)
+- ⚙️ Settings for check intervals, login item behavior, notifications, and Homebrew commands
+- 📋 Browse installed packages, inspect package info, and uninstall packages with confirmation
+- 💻 Embedded terminal emulator using [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm), with configurable light/dark appearance and color presets
 
 ## Screenshots
 
@@ -51,6 +47,27 @@ brew install --cask brewbar
 Alternatively, you can download directly from [releases](https://github.com/joshbeard/BrewBar/releases).
 
 **NOTE:** This is not notarized by Apple. You may need to run `xattr -d com.apple.quarantine /Applications/BrewBar.app` if you get a warning that the application is corrupted.
+
+## Development
+
+```shell
+make build
+make release
+```
+
+### Pre-prod builds from CI
+
+Non-tag workflow runs (for example pushes to `main`, pull requests, or a manual
+[workflow run](https://github.com/joshbeard/BrewBar/actions)) upload a single
+artifact named `BrewBar-dev-<git-sha>-<run-number>` containing `BrewBar.zip`,
+`BrewBar.dmg`, and `brewbar.rb`. In GitHub, open **Actions**, select the run,
+then **Artifacts** to download. Those artifacts use a 90-day retention window
+set in the workflow.
+
+Local notification permission requires a validly signed app. Local builds use an
+Apple Development signing identity when one is available; otherwise they fall
+back to ad hoc signing, which may prevent macOS from granting notification
+permission.
 
 ## License
 

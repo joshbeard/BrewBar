@@ -59,11 +59,18 @@ Icon?
 ._*
 .Spotlight-V100
 .Trashes
+buildServer.json
 
 *.app
-
+dist/
 # GitHub Actions
 exportOptions.plist
 
+# Local Xcode Build Server config
+buildServer.json
+
 temp_icons/
 .github/readme/unoptimized/
+
+# Local Homebrew tap (created by devtools/homebrew-outdated-fixture/Makefile)
+devtools/homebrew-outdated-fixture/.git/

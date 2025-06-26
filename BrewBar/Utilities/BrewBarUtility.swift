@@ -1,5 +1,16 @@
 import Foundation
 
+enum BrewBarError: LocalizedError {
+    case brewNotFound
+
+    var errorDescription: String? {
+        switch self {
+        case .brewNotFound:
+            return "Brew executable not found"
+        }
+    }
+}
+
 // MARK: - Homebrew Utility
 
 class BrewBarUtility {
@@ -66,34 +77,39 @@ class BrewBarUtility {
         return formatter
     }()
 
-    // Helper method to run brew commands and get the output
-    func runBrewCommand(_ arguments: [String], completion: @escaping (String?, Int32, Error?) -> Void) {
+    func runBrewCommand(_ arguments: [String]) async throws -> (output: String, exitCode: Int32) {
         guard let brewExec = brewPath else {
-            completion(nil, -1, NSError(domain: "BrewBar", code: 1, userInfo: [NSLocalizedDescriptionKey: "Brew executable not found"]))
-            return
+            throw BrewBarError.brewNotFound
         }
 
-        DispatchQueue.global(qos: .userInitiated).async {
-            let task = Process()
-            task.executableURL = URL(fileURLWithPath: brewExec)
-            task.arguments = arguments
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let task = Process()
+                task.executableURL = URL(fileURLWithPath: brewExec)
+                task.arguments = arguments
 
-            let outputPipe = Pipe()
-            task.standardOutput = outputPipe
+                let outputPipe = Pipe()
+                let errorPipe = Pipe()
+                task.standardOutput = outputPipe
+                task.standardError = errorPipe
 
-            do {
-                try task.run()
-                task.waitUntilExit()
+                do {
+                    try task.run()
+                    task.waitUntilExit()
 
-                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-                let output = String(data: outputData, encoding: .utf8)
+                    let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                    let output = String(data: outputData, encoding: .utf8) ?? ""
 
-                DispatchQueue.main.async {
-                    completion(output, task.terminationStatus, nil)
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    completion(nil, -1, error)
+                    let errData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                    if let stderr = String(data: errData, encoding: .utf8)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines), !stderr.isEmpty
+                    {
+                        LoggingUtility.shared.log("brew stderr (\(arguments.joined(separator: " "))): \(stderr)")
+                    }
+
+                    continuation.resume(returning: (output, task.terminationStatus))
+                } catch {
+                    continuation.resume(throwing: error)
                 }
             }
         }
@@ -170,5 +186,28 @@ class BrewBarUtility {
         } catch {
             LoggingUtility.shared.log("Error setting up Terminal command: \(error.localizedDescription)")
         }
+    }
+
+    /// Parsed formula/cask names from BrewBar-style `brew uninstall` argv.
+    static func packageNames(fromUninstallArguments arguments: [String]) -> [String] {
+        guard arguments.first == "uninstall" else { return [] }
+        var out: [String] = []
+        var i = 1
+        while i < arguments.count {
+            let t = arguments[i]
+            if t == "--cask" {
+                i += 1
+                if i < arguments.count {
+                    out.append(arguments[i])
+                    i += 1
+                }
+            } else if t.hasPrefix("-") {
+                i += 1
+            } else {
+                out.append(t)
+                i += 1
+            }
+        }
+        return out
     }
 }

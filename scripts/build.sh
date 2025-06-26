@@ -7,7 +7,6 @@ set -e
 # Usage:
 #   ./scripts/build.sh                      # Build with auto-detected version
 #   ./scripts/build.sh 1.2.3                # Build with specific version
-#   ./scripts/build.sh --update 1.2.3       # Update version in existing app without rebuilding
 #   ./scripts/build.sh --info               # Show current app version info
 
 # Function to get the latest git tag version
@@ -34,38 +33,17 @@ show_app_version() {
     fi
 }
 
+find_codesign_identity() {
+    security find-identity -v -p codesigning 2>/dev/null \
+        | sed -n 's/.*"\(Apple Development:.*\)"/\1/p' \
+        | head -n 1
+}
+
 # Function to update version in an existing app
 update_app_version() {
-    local version="$1"
-    local build_number="$2"
-    local build_date="$3"
-    local app_path="$4"
-
-    if [ ! -d "$app_path" ]; then
-        echo "Error: App not found at $app_path"
-        exit 1
-    fi
-
-    local info_plist="$app_path/Contents/Info.plist"
-
-    if [ ! -f "$info_plist" ]; then
-        echo "Error: Info.plist not found at $info_plist"
-        exit 1
-    fi
-
-    echo "Updating version information in $app_path"
-    echo "Version: $version"
-    echo "Build: $build_number"
-    echo "Date: $build_date"
-
-    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$info_plist"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build_number" "$info_plist"
-    /usr/libexec/PlistBuddy -c "Add :BuildDate string $build_date" "$info_plist" 2>/dev/null || \
-    /usr/libexec/PlistBuddy -c "Set :BuildDate $build_date" "$info_plist"
-
-    echo "Version updated successfully!"
-    show_app_version "$app_path"
-    echo "To see the change, quit the app (if running) and relaunch it."
+    echo "Error: --update is no longer supported because editing Info.plist after signing invalidates the app bundle."
+    echo "Rebuild instead: $0 <version>"
+    exit 1
 }
 
 # Move to project root directory
@@ -83,8 +61,7 @@ if [ "$1" = "--update" ]; then
         echo "Usage: $0 --update <version>"
         exit 1
     fi
-    VERSION="$2"
-    update_app_version "$VERSION" "$BUILD_NUMBER" "$BUILD_DATE" "$APP_PATH"
+    update_app_version
     exit 0
 elif [ "$1" = "--info" ]; then
     # Show current app version
@@ -120,16 +97,13 @@ echo "Version: $VERSION"
 echo "Build: $BUILD_NUMBER"
 echo "Date: $BUILD_DATE"
 echo
-
-# Create a temporary Info.plist with the version information
-TEMP_INFO_PLIST=$(mktemp)
-cp "${PROJECT_ROOT}/BrewBar/Info.plist" "$TEMP_INFO_PLIST"
-
-# Update the plist with version information
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$TEMP_INFO_PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$TEMP_INFO_PLIST"
-/usr/libexec/PlistBuddy -c "Add :BuildDate string $BUILD_DATE" "$TEMP_INFO_PLIST" 2>/dev/null || \
-/usr/libexec/PlistBuddy -c "Set :BuildDate $BUILD_DATE" "$TEMP_INFO_PLIST"
+SIGNING_IDENTITY="${CODE_SIGN_IDENTITY:-$(find_codesign_identity)}"
+if [ -n "$SIGNING_IDENTITY" ]; then
+    echo "Signing mode: Apple Development ($SIGNING_IDENTITY)"
+else
+    SIGNING_IDENTITY="-"
+    echo "Signing mode: ad hoc (no Apple Development identity found; local notifications may be unavailable)"
+fi
 
 # Build the app
 echo "Building with xcodebuild..."
@@ -137,21 +111,16 @@ xcodebuild -project "${PROJECT_ROOT}/BrewBar.xcodeproj" \
     -scheme BrewBar \
     -configuration Release \
     -derivedDataPath "${PROJECT_ROOT}/build" \
+    CODE_SIGN_STYLE=Manual \
+    CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
+    MARKETING_VERSION="$VERSION" \
+    CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+    BUILD_DATE="$BUILD_DATE" \
     clean build
-
-# Since Xcode is set to generate its own Info.plist, we need to overwrite it after the build
-echo "Injecting version information into built app..."
-BUILT_APP_PLIST="${PROJECT_ROOT}/build/Build/Products/Release/BrewBar.app/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$BUILT_APP_PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$BUILT_APP_PLIST"
-/usr/libexec/PlistBuddy -c "Add :BuildDate string $BUILD_DATE" "$BUILT_APP_PLIST" 2>/dev/null || \
-/usr/libexec/PlistBuddy -c "Set :BuildDate $BUILD_DATE" "$BUILT_APP_PLIST"
-
-# Cleanup temp file
-rm "$TEMP_INFO_PLIST"
 
 # Copy the app to the current directory
 echo "Copying built app to ./BrewBar.app"
+rm -rf "${PROJECT_ROOT}/BrewBar.app"
 cp -R "${PROJECT_ROOT}/build/Build/Products/Release/BrewBar.app" "${PROJECT_ROOT}/"
 
 echo "Build complete!"

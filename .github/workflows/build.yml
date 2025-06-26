@@ -41,6 +41,9 @@ jobs:
           echo "Setting development version to $VERSION"
         fi
 
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_OUTPUT
+
         # Set environment variables and outputs
         echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
@@ -60,11 +63,23 @@ jobs:
       env:
         VERSION: ${{ env.APP_VERSION }}
 
-    - name: Upload app (zip)
+    - name: Upload app (zip) for release
+      if: startsWith(github.ref, 'refs/tags/')
       uses: actions/upload-artifact@v6
       with:
         name: BrewBar-zip
         path: ./dist/BrewBar.zip
+
+    - name: Upload pre-prod build artifacts
+      if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      uses: actions/upload-artifact@v6
+      with:
+        name: BrewBar-dev-${{ steps.setup_env.outputs.SHORT_SHA }}-${{ github.run_number }}
+        path: |
+          ./dist/BrewBar.zip
+          ./dist/BrewBar.dmg
+          ./dist/brewbar.rb
+        retention-days: 90
 
     - name: Upload DMG
       if: startsWith(github.ref, 'refs/tags/')

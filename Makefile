@@ -42,10 +42,10 @@ build:
 	@echo "Building BrewBar with version $(VERSION)..."
 	@scripts/build.sh "$(VERSION)"
 
-# Create signed app using entitlements
+# Verify the app produced by Xcode/build.sh.
 app: build
-	@echo "Signing app..."
-	@scripts/codesign.sh $(BUILT_APP)
+	@echo "Verifying app signature..."
+	@scripts/codesign.sh $(BUILT_APP) --verify-only
 
 # Create DMG installer
 dmg: app

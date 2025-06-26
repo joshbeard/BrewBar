@@ -1,11 +1,13 @@
 import Foundation
+import os
 
 // MARK: - Logging Utilities
 
 class LoggingUtility {
     static let shared = LoggingUtility()
 
-    // Number of days to keep logs
+    private let logger = Logger(subsystem: "me.joshbeard.BrewBar", category: "general")
+
     private let logRetentionDays = 5
 
     static var logDirectoryURL: URL {
@@ -34,12 +36,7 @@ class LoggingUtility {
     }
 
     func log(_ message: String) {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        let timestamp = formatter.string(from: Date())
-        print("[\(timestamp)] \(message)")
-
-        // Also log to a file for debugging outside Xcode
+        logger.info("\(message, privacy: .public)")
         logToFile(message)
     }
 
