@@ -785,13 +785,49 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func handleWakeFromSleep() {
         LoggingUtility.shared.log("System woke from sleep")
 
-        // Check if we have a next scheduled check time and it's in the past
         let now = Date()
-        if let nextCheck = nextScheduledCheckTime, nextCheck < now {
-            LoggingUtility.shared.log("Missed scheduled update during sleep, running now")
-            checkForUpdates()
+        let currentInterval = getCurrentInterval()
+
+        // Only proceed if we have automatic checking enabled (interval > 0)
+        guard currentInterval > 0 else {
+            LoggingUtility.shared.log("Manual checking enabled, skipping wake-from-sleep check")
+            scheduleUpdateTimer()
+            return
+        }
+
+        // Check if we need to run an update based on the actual configured interval
+        var shouldRunUpdate = false
+        var reason = ""
+
+        if let lastCheck = lastCheckTime {
+            let timeSinceLastCheck = now.timeIntervalSince(lastCheck)
+            if timeSinceLastCheck >= currentInterval {
+                shouldRunUpdate = true
+                reason = "Time since last check (\(Int(timeSinceLastCheck/60)) min) exceeds interval (\(Int(currentInterval/60)) min)"
+            } else {
+                let timeRemaining = currentInterval - timeSinceLastCheck
+                LoggingUtility.shared.log("Last check was \(Int(timeSinceLastCheck/60)) minutes ago, \(Int(timeRemaining/60)) minutes remaining until next check")
+            }
         } else {
-            // Reschedule the timer to ensure it's accurate after sleep
+            // No previous check recorded, run one now
+            shouldRunUpdate = true
+            reason = "No previous check time recorded"
+        }
+
+        // Also check if the scheduled check time was missed (fallback logic)
+        if !shouldRunUpdate, let nextCheck = nextScheduledCheckTime, nextCheck < now {
+            shouldRunUpdate = true
+            reason = "Scheduled check time was missed during sleep"
+        }
+
+        if shouldRunUpdate {
+            LoggingUtility.shared.log("Running update check after wake: \(reason)")
+            checkForUpdates(runUpdate: true) {
+                // Reschedule timer after check completes
+                self.scheduleUpdateTimer()
+            }
+        } else {
+            // Just reschedule the timer to ensure it's accurate after sleep
             scheduleUpdateTimer()
         }
     }
