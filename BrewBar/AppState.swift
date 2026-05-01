@@ -5,7 +5,9 @@ import SwiftUI
 struct IntervalOption: Identifiable {
     let name: String
     let value: TimeInterval
-    var id: String { name }
+    var id: String {
+        name
+    }
 }
 
 enum SheetAction: Equatable {

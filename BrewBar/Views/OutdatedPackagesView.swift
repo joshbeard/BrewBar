@@ -10,14 +10,18 @@ class PackageViewState {
     var inlineTerminalSessionID: UUID?
     var isTerminalProcessRunning: Bool = false
 
-    var hasInlineTerminal: Bool { inlineTerminalSessionID != nil }
+    var hasInlineTerminal: Bool {
+        inlineTerminalSessionID != nil
+    }
 }
 
 // MARK: - Brew info sheet target (outdated or installed row)
 
 /// Minimal context for `brew info` / `brew info --cask`.
 private struct BrewInfoSheetPackage: Identifiable, Hashable {
-    var id: String { name }
+    var id: String {
+        name
+    }
     let name: String
     let source: String
 
@@ -58,16 +62,22 @@ struct OutdatedPackagesView: View {
 
     private let brewExecutablePath = BrewBarUtility.shared.brewPath ?? "/opt/homebrew/bin/brew"
 
-    private var packagesInfo: [PackageInfo] { appState.currentOutdatedPackages }
-    private var installedPackages: [InstalledPackageInfo] { appState.currentInstalledPackages }
-    private var errorOccurred: Bool { appState.lastCheckError }
+    private var packagesInfo: [PackageInfo] {
+        appState.currentOutdatedPackages
+    }
+    private var installedPackages: [InstalledPackageInfo] {
+        appState.currentInstalledPackages
+    }
+    private var errorOccurred: Bool {
+        appState.lastCheckError
+    }
 
     private var resolvedTerminalScheme: ColorScheme {
         let mode = TerminalAppearanceMode(rawValue: terminalAppearanceRaw) ?? .matchSystem
         switch mode {
-        case .matchSystem: return colorScheme
-        case .dark: return .dark
-        case .light: return .light
+            case .matchSystem: return colorScheme
+            case .dark: return .dark
+            case .light: return .light
         }
     }
 
@@ -110,9 +120,9 @@ struct OutdatedPackagesView: View {
         .onChange(of: appState.pendingSheetAction) { _, action in
             if let action {
                 switch action {
-                case .check: handlePendingCheckAction()
-                case .update: handlePendingUpdateAction()
-                case .upgradeAll: handlePendingUpgradeAllAction()
+                    case .check: handlePendingCheckAction()
+                    case .update: handlePendingUpdateAction()
+                    case .upgradeAll: handlePendingUpgradeAllAction()
                 }
                 appState.pendingSheetAction = nil
             }
@@ -142,7 +152,6 @@ struct OutdatedPackagesView: View {
         )
     }
 
-    @ViewBuilder
     private var packagesListPane: some View {
         VStack(alignment: .leading, spacing: 10) {
             if errorOccurred {
@@ -332,7 +341,6 @@ struct OutdatedPackagesView: View {
         startInlineBrewTask(title: "Upgrading All Packages...", arguments: BrewBarManager.shared.upgradeCommand)
     }
 
-    @ViewBuilder
     func OutdatedPackagesTabView() -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if packagesInfo.isEmpty {
@@ -359,7 +367,6 @@ struct OutdatedPackagesView: View {
         }
     }
 
-    @ViewBuilder
     private var outdatedTabAllUpToDateContent: some View {
         VStack(spacing: 15) {
             Spacer()
@@ -383,7 +390,6 @@ struct OutdatedPackagesView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    @ViewBuilder
     private var outdatedTabToolbar: some View {
         HStack {
             Button("Select All") {
@@ -423,7 +429,6 @@ struct OutdatedPackagesView: View {
         }
     }
 
-    @ViewBuilder
     private var outdatedTabScrollList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 1) {
@@ -446,7 +451,6 @@ struct OutdatedPackagesView: View {
         }
     }
 
-    @ViewBuilder
     private func outdatedPackageRow(index: Int, package: PackageInfo) -> some View {
         HStack {
             Checkbox(isChecked: Binding(
@@ -515,7 +519,6 @@ struct OutdatedPackagesView: View {
         .background(selectedPackages.contains(package.name) ? Color.blue.opacity(0.1) : (index % 2 == 0 ? Color.clear : Color.gray.opacity(0.05)))
     }
 
-    @ViewBuilder
     func InstalledPackagesTabView() -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if installedPackages.isEmpty {
@@ -760,8 +763,8 @@ struct OutdatedPackagesView: View {
                         errorMessage = nil
                         output =
                             code != 0
-                            ? "Exit status \(code) (output may still be useful):\n\n\(trimmed)"
-                            : trimmed
+                                ? "Exit status \(code) (output may still be useful):\n\n\(trimmed)"
+                                : trimmed
                     }
                 }
             } catch {

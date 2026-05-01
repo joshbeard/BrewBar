@@ -180,9 +180,9 @@ struct TerminalSettingsView: View {
     private var previewScheme: ColorScheme {
         let mode = TerminalAppearanceMode(rawValue: appearanceRaw) ?? .matchSystem
         switch mode {
-        case .matchSystem: return colorScheme
-        case .dark: return .dark
-        case .light: return .light
+            case .matchSystem: return colorScheme
+            case .dark: return .dark
+            case .light: return .light
         }
     }
 

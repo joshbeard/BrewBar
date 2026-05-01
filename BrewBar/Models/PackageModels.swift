@@ -4,14 +4,16 @@ import SwiftUI
 // MARK: - Package Info Structure
 
 struct PackageInfo: Identifiable, Hashable {
-    var id: String { name }
+    var id: String {
+        name
+    }
     let name: String
     let currentVersion: String
     let availableVersion: String
     var source: String  // Will contain tap or cask info
     var isSelected: Bool = false
 
-    // To support Hashable
+    /// To support Hashable
     func hash(into hasher: inout Hasher) {
         hasher.combine(name)
     }
@@ -24,13 +26,15 @@ struct PackageInfo: Identifiable, Hashable {
 // MARK: - Installed Package Info Structure
 
 struct InstalledPackageInfo: Identifiable, Hashable {
-    var id: String { name }
+    var id: String {
+        name
+    }
     let name: String
     let version: String
     let source: String  // Will contain tap or cask info
     var isSelected: Bool = false
 
-    // To support Hashable
+    /// To support Hashable
     func hash(into hasher: inout Hasher) {
         hasher.combine(name)
     }

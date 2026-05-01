@@ -1,6 +1,7 @@
 import AppKit
 
 // MARK: - AppDelegate (Minimal Adapter)
+
 // Core logic lives in AppState. This handles NSApp lifecycle and NSWindowDelegate.
 
 @MainActor

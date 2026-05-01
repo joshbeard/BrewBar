@@ -5,8 +5,8 @@ enum BrewBarError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .brewNotFound:
-            return "Brew executable not found"
+            case .brewNotFound:
+                return "Brew executable not found"
         }
     }
 }
@@ -16,7 +16,7 @@ enum BrewBarError: LocalizedError {
 class BrewBarUtility {
     static let shared = BrewBarUtility()
 
-    // Homebrew executable path
+    /// Homebrew executable path
     let brewPath: String? = {
         // These are the common locations for Homebrew
         let commonPaths = [
@@ -70,7 +70,7 @@ class BrewBarUtility {
         return nil
     }()
 
-    // Helper for formatting relative time
+    /// Helper for formatting relative time
     let relativeDateFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full // Use full units instead of abbreviated
@@ -115,7 +115,7 @@ class BrewBarUtility {
         }
     }
 
-    // Helper method to run brew commands in Terminal.app for interactive commands
+    /// Helper method to run brew commands in Terminal.app for interactive commands
     func runInteractiveBrewCommand(_ args: [String]) {
         guard let brewExec = brewPath else {
             LoggingUtility.shared.log("ERROR: Brew executable not found")

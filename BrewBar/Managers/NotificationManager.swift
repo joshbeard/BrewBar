@@ -19,7 +19,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     /// Last known system authorization (refreshed when we read settings or complete a request).
     private(set) var notificationsAuthorized = false
 
-    private override init() {
+    override private init() {
         super.init()
         if UserDefaults.standard.object(forKey: BrewBarNotificationPreferences.userToggleKey) == nil {
             UserDefaults.standard.set(true, forKey: BrewBarNotificationPreferences.userToggleKey)
@@ -122,12 +122,12 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
     private static func allowsDelivery(_ settings: UNNotificationSettings) -> Bool {
         switch settings.authorizationStatus {
-        case .authorized, .provisional, .ephemeral:
-            true
-        case .denied, .notDetermined:
-            false
-        @unknown default:
-            false
+            case .authorized, .provisional, .ephemeral:
+                true
+            case .denied, .notDetermined:
+                false
+            @unknown default:
+                false
         }
     }
 
@@ -137,58 +137,58 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         var settings = await center.notificationSettings()
 
         switch settings.authorizationStatus {
-        case .authorized, .provisional, .ephemeral:
-            notificationsAuthorized = true
-            if settings.alertSetting == .disabled {
-                LoggingUtility.shared.log(
-                    "Notification alertSetting is disabled; banners may not appear (Focus or per-app style)."
-                )
-            }
-            return true
-
-        case .denied:
-            notificationsAuthorized = false
-            await logSettings(label: "authorization denied")
-            LoggingUtility.shared.log(
-                "Notifications denied in System Settings (Notifications → BrewBar). Open System Settings to enable."
-            )
-            return false
-
-        case .notDetermined:
-            if context == .userFacingTest {
-                await Task.yield()
-            }
-            do {
-                let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge, .provisional])
-                if !granted {
-                    LoggingUtility.shared.log("requestAuthorization returned false.")
-                    await logSettings(label: "after requestAuthorization false")
-                    return false
-                }
-            } catch {
-                let ns = error as NSError
-                LoggingUtility.shared.log(
-                    "requestAuthorization error: domain=\(ns.domain) code=\(ns.code) description=\(error.localizedDescription)"
-                )
-                if ns.domain == "UNErrorDomain", ns.code == 1 {
+            case .authorized, .provisional, .ephemeral:
+                notificationsAuthorized = true
+                if settings.alertSetting == .disabled {
                     LoggingUtility.shared.log(
-                        "UNError 1 usually means macOS refused notification registration for this process. Check that the app bundle is validly signed."
+                        "Notification alertSetting is disabled; banners may not appear (Focus or per-app style)."
                     )
                 }
-                await logSettings(label: "after requestAuthorization error")
-                return false
-            }
-            settings = await center.notificationSettings()
-            notificationsAuthorized = Self.allowsDelivery(settings)
-            if !notificationsAuthorized {
-                await logSettings(label: "after request unexpected status")
-            }
-            return notificationsAuthorized
+                return true
 
-        @unknown default:
-            notificationsAuthorized = false
-            LoggingUtility.shared.log("Unknown authorizationStatus \(settings.authorizationStatus.rawValue).")
-            return false
+            case .denied:
+                notificationsAuthorized = false
+                await logSettings(label: "authorization denied")
+                LoggingUtility.shared.log(
+                    "Notifications denied in System Settings (Notifications → BrewBar). Open System Settings to enable."
+                )
+                return false
+
+            case .notDetermined:
+                if context == .userFacingTest {
+                    await Task.yield()
+                }
+                do {
+                    let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge, .provisional])
+                    if !granted {
+                        LoggingUtility.shared.log("requestAuthorization returned false.")
+                        await logSettings(label: "after requestAuthorization false")
+                        return false
+                    }
+                } catch {
+                    let ns = error as NSError
+                    LoggingUtility.shared.log(
+                        "requestAuthorization error: domain=\(ns.domain) code=\(ns.code) description=\(error.localizedDescription)"
+                    )
+                    if ns.domain == "UNErrorDomain", ns.code == 1 {
+                        LoggingUtility.shared.log(
+                            "UNError 1 usually means macOS refused notification registration for this process. Check that the app bundle is validly signed."
+                        )
+                    }
+                    await logSettings(label: "after requestAuthorization error")
+                    return false
+                }
+                settings = await center.notificationSettings()
+                notificationsAuthorized = Self.allowsDelivery(settings)
+                if !notificationsAuthorized {
+                    await logSettings(label: "after request unexpected status")
+                }
+                return notificationsAuthorized
+
+            @unknown default:
+                notificationsAuthorized = false
+                LoggingUtility.shared.log("Unknown authorizationStatus \(settings.authorizationStatus.rawValue).")
+                return false
         }
     }
 
