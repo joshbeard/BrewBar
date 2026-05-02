@@ -151,14 +151,7 @@ jobs:
           exit 1
         fi
 
-        # Make sure scripts are executable (Makefile might need them)
         chmod +x ./scripts/*.sh
-
-        # Show debugging info
-        echo "Files in current directory:"
-        ls -la
-        echo "Files in dist directory:"
-        ls -la ./dist
 
         # Check if brewbar.rb exists in dist
         if [ ! -f "./dist/brewbar.rb" ]; then
@@ -166,5 +159,5 @@ jobs:
           exit 1
         fi
 
-        # Update the Homebrew tap using make
-        make update-tap VERSION=${{ needs.build.outputs.version }}
+        # Call the script directly — `make update-tap` chains through build/xcodebuild which isn't available on Ubuntu
+        scripts/update_tap.sh "${{ needs.build.outputs.version }}" "./dist/brewbar.rb"
