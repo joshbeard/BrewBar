@@ -27,11 +27,9 @@ class BrewBarUtility {
         ]
 
         // Check if any of the common paths exist
-        for path in commonPaths {
-            if FileManager.default.fileExists(atPath: path) {
-                print("Found brew at: \(path)")
-                return path
-            }
+        for path in commonPaths where FileManager.default.fileExists(atPath: path) {
+            print("Found brew at: \(path)")
+            return path
         }
 
         // Try using /bin/sh to run 'which brew' - more likely to work in Xcode
