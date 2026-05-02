@@ -172,7 +172,6 @@ class AppState {
     func cleanup() {
         updateTimer?.invalidate()
         updateTimer = nil
-        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Timer Scheduling

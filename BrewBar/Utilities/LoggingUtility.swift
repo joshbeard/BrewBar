@@ -10,8 +10,10 @@ class LoggingUtility {
 
     private let logRetentionDays = 5
 
-    static var logDirectoryURL: URL {
-        let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+    static var logDirectoryURL: URL? {
+        guard let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            return nil
+        }
         return appSupportURL.appendingPathComponent("BrewBar/Logs", isDirectory: true)
     }
 
@@ -91,7 +93,10 @@ class LoggingUtility {
 
     func cleanupOldLogs() {
         let fileManager = FileManager.default
-        let logsDir = Self.logDirectoryURL
+        guard let logsDir = Self.logDirectoryURL else {
+            print("Unable to resolve log directory for cleanup")
+            return
+        }
 
         // Get the cutoff date (5 days ago)
         let calendar = Calendar.current

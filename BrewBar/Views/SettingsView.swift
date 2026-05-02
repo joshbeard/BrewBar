@@ -112,7 +112,9 @@ struct GeneralSettingsView: View {
                     }
                 }
                 Button("Open Logs Folder") {
-                    NSWorkspace.shared.open(LoggingUtility.logDirectoryURL)
+                    if let url = LoggingUtility.logDirectoryURL {
+                        NSWorkspace.shared.open(url)
+                    }
                 }
             }
         }
