@@ -1,8 +1,8 @@
 # BrewBar
 
-A simple menu bar app for macOS that monitors your Homebrew packages for
-updates. It sits in your menu bar and checks for outdated packages on a schedule
-you define.
+A simple menu bar app for macOS that monitors your [Homebrew](https://brew.sh/)
+packages for updates. It sits in your menu bar and checks for outdated packages
+on a schedule you define.
 
 > [!NOTE]
 > BrewBar is a small personal project. It is usable, but it is not notarized by
