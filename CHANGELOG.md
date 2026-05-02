@@ -2,7 +2,7 @@
 
 All notable changes to BrewBar will be documented in this file.
 
-## 1.0.0 - TBD
+## 1.0.0 - 2026-05-02
 
 ### Added
 
