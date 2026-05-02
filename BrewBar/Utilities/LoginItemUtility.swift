@@ -3,7 +3,7 @@ import ServiceManagement
 
 // MARK: - Login Item Helper
 
-class LoginItemUtility {
+enum LoginItemUtility {
     static func setLoginItemEnabled(_ enabled: Bool) {
         if enabled {
             do {

@@ -595,18 +595,18 @@ struct OutdatedPackagesView: View {
 
     private var filteredOutdatedPackages: [PackageInfo] {
         if searchText.isEmpty { return packagesInfo }
-        return packagesInfo.filter {
-            $0.name.localizedCaseInsensitiveContains(searchText) ||
-                $0.source.localizedCaseInsensitiveContains(searchText)
+        return packagesInfo.filter { package in
+            package.name.localizedCaseInsensitiveContains(searchText) ||
+                package.source.localizedCaseInsensitiveContains(searchText)
         }
     }
 
     private var filteredInstalledPackages: [InstalledPackageInfo] {
         if searchText.isEmpty { return installedPackages }
-        return installedPackages.filter {
-            $0.name.localizedCaseInsensitiveContains(searchText) ||
-                $0.source.localizedCaseInsensitiveContains(searchText) ||
-                $0.version.localizedCaseInsensitiveContains(searchText)
+        return installedPackages.filter { package in
+            package.name.localizedCaseInsensitiveContains(searchText) ||
+                package.source.localizedCaseInsensitiveContains(searchText) ||
+                package.version.localizedCaseInsensitiveContains(searchText)
         }
     }
 
