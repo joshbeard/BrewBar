@@ -3,7 +3,9 @@ import AppKit
 enum BrewBarAbout {
     /// Standard system About panel with copyright and clickable GitHub link in Credits.
     static func presentStandardPanel() {
-        let url = URL(string: "https://github.com/joshbeard/BrewBar")!
+        guard let url = URL(string: "https://github.com/joshbeard/BrewBar") else {
+            return
+        }
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         let font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)

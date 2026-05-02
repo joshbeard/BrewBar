@@ -37,7 +37,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationWillTerminate(_ aNotification: Notification) {
         appState.cleanup()
+    }
+
+    deinit {
         NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
     // MARK: - NSWindowDelegate
