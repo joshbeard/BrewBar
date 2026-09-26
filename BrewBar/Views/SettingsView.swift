@@ -140,7 +140,9 @@ struct GeneralSettingsView: View {
 
     private func intervalSecondsLabel(for value: TimeInterval) -> String {
         let n = Int(value)
-        if n == 1 { return "1 second" }
+        if n == 1 {
+            return "1 second"
+        }
         return "\(n) seconds"
     }
 

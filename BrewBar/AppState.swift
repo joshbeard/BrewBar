@@ -58,8 +58,12 @@ class AppState {
     // MARK: - Computed Properties (Menu)
 
     var menuBarIcon: String {
-        if isChecking { return "arrow.clockwise" }
-        if lastCheckError { return "xmark.circle" }
+        if isChecking {
+            return "arrow.clockwise"
+        }
+        if lastCheckError {
+            return "xmark.circle"
+        }
         if currentOutdatedPackages.isEmpty {
             return lastCheckTime != nil ? "checkmark.circle" : "mug"
         }
@@ -67,9 +71,15 @@ class AppState {
     }
 
     var statusText: String {
-        if isChecking { return "Checking for updates..." }
-        if lastCheckError { return "Error checking updates" }
-        if currentOutdatedPackages.isEmpty { return "Homebrew is up to date" }
+        if isChecking {
+            return "Checking for updates..."
+        }
+        if lastCheckError {
+            return "Error checking updates"
+        }
+        if currentOutdatedPackages.isEmpty {
+            return "Homebrew is up to date"
+        }
         let count = currentOutdatedPackages.count
         let maxDisplay = 3
         var text = "\(count) outdated package\(count == 1 ? "" : "s")"
@@ -93,7 +103,9 @@ class AppState {
         guard let nextCheckTime = nextScheduledCheckTime else { return "Next check: Manual only" }
         let interval = nextCheckTime.timeIntervalSinceNow
 
-        if interval <= 5 { return "Next check: Checking soon..." }
+        if interval <= 5 {
+            return "Next check: Checking soon..."
+        }
 
         let timeUntil = formatTimeInterval(interval)
         let timeFormatter = DateFormatter()
@@ -452,11 +464,15 @@ class AppState {
                 }
             } else if commandArgs.first == "update" || (commandArgs.first == "upgrade" && commandArgs.count == 1) {
                 LoggingUtility.shared.log("'\(commandArgs.first ?? "")' command finished. Triggering full background refresh.")
-                if commandArgs.first == "upgrade" { wasUpgradeAll = true }
+                if commandArgs.first == "upgrade" {
+                    wasUpgradeAll = true
+                }
                 Task { await triggerFullBackgroundRefresh() }
             }
 
-            if wasUpgradeAll { Task { await checkIfAppWasUpdated() } }
+            if wasUpgradeAll {
+                Task { await checkIfAppWasUpdated() }
+            }
         } else {
             LoggingUtility.shared.log("Task \(commandArgs.joined(separator: " ")) failed with exit code \(exitCode). Triggering full refresh.")
             Task { await triggerFullBackgroundRefresh() }
@@ -552,8 +568,12 @@ class AppState {
     // MARK: - Helpers
 
     private func formatTimeInterval(_ interval: TimeInterval) -> String {
-        if interval <= 0 { return "now" }
-        if interval < 60 { return "< 1m" }
+        if interval <= 0 {
+            return "now"
+        }
+        if interval < 60 {
+            return "< 1m"
+        }
 
         let minutes = Int(interval / 60) % 60
         let hours = Int(interval / 3600)
