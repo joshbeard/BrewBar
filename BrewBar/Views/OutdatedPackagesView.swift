@@ -134,8 +134,8 @@ struct OutdatedPackagesView: View {
             pendingUninstall?.dialogTitle ?? "Uninstall",
             isPresented: Binding(
                 get: { pendingUninstall != nil },
-                set: {
-                    if !$0 {
+                set: { newValue in
+                    if !newValue {
                         pendingUninstall = nil
                     }
                 }
