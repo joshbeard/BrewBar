@@ -134,7 +134,11 @@ struct OutdatedPackagesView: View {
             pendingUninstall?.dialogTitle ?? "Uninstall",
             isPresented: Binding(
                 get: { pendingUninstall != nil },
-                set: { if !$0 { pendingUninstall = nil } }
+                set: { newValue in
+                    if !newValue {
+                        pendingUninstall = nil
+                    }
+                }
             ),
             presenting: pendingUninstall,
             actions: { prompt in
@@ -179,7 +183,9 @@ struct OutdatedPackagesView: View {
                     }
                     .tag(0)
                     .onChange(of: selectedTab) { _, newValue in
-                        if newValue != 0 { searchText = "" }
+                        if newValue != 0 {
+                            searchText = ""
+                        }
                     }
 
                     VStack {
@@ -190,7 +196,9 @@ struct OutdatedPackagesView: View {
                     }
                     .tag(1)
                     .onChange(of: selectedTab) { _, newValue in
-                        if newValue != 1 { searchText = "" }
+                        if newValue != 1 {
+                            searchText = ""
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -456,8 +464,11 @@ struct OutdatedPackagesView: View {
             Checkbox(isChecked: Binding(
                 get: { selectedPackages.contains(package.name) },
                 set: { isSelected in
-                    if isSelected { selectedPackages.insert(package.name) }
-                    else { selectedPackages.remove(package.name) }
+                    if isSelected {
+                        selectedPackages.insert(package.name)
+                    } else {
+                        selectedPackages.remove(package.name)
+                    }
                 }
             ))
             .frame(width: 60, alignment: .leading)
@@ -500,7 +511,9 @@ struct OutdatedPackagesView: View {
                 Button {
                     let isCask = package.source == "cask"
                     var args = ["uninstall"]
-                    if isCask { args.append("--cask") }
+                    if isCask {
+                        args.append("--cask")
+                    }
                     args.append(package.name)
                     queueUninstallConfirmation(
                         taskTitle: "Uninstalling \(package.name)...",
@@ -563,7 +576,9 @@ struct OutdatedPackagesView: View {
                             var args = ["uninstall"]
                             for name in names {
                                 let isCask = installedPackages.first { $0.name == name }?.source == "cask"
-                                if isCask == true { args.append("--cask") }
+                                if isCask == true {
+                                    args.append("--cask")
+                                }
                                 args.append(name)
                             }
                             let title: String
@@ -594,7 +609,9 @@ struct OutdatedPackagesView: View {
     }
 
     private var filteredOutdatedPackages: [PackageInfo] {
-        if searchText.isEmpty { return packagesInfo }
+        if searchText.isEmpty {
+            return packagesInfo
+        }
         return packagesInfo.filter { package in
             package.name.localizedCaseInsensitiveContains(searchText) ||
                 package.source.localizedCaseInsensitiveContains(searchText)
@@ -602,7 +619,9 @@ struct OutdatedPackagesView: View {
     }
 
     private var filteredInstalledPackages: [InstalledPackageInfo] {
-        if searchText.isEmpty { return installedPackages }
+        if searchText.isEmpty {
+            return installedPackages
+        }
         return installedPackages.filter { package in
             package.name.localizedCaseInsensitiveContains(searchText) ||
                 package.source.localizedCaseInsensitiveContains(searchText) ||
@@ -637,8 +656,11 @@ struct OutdatedPackagesView: View {
                             Checkbox(isChecked: Binding(
                                 get: { selectedPackages.contains(package.name) },
                                 set: { isSelected in
-                                    if isSelected { selectedPackages.insert(package.name) }
-                                    else { selectedPackages.remove(package.name) }
+                                    if isSelected {
+                                        selectedPackages.insert(package.name)
+                                    } else {
+                                        selectedPackages.remove(package.name)
+                                    }
                                 }
                             ))
                             .frame(width: 60, alignment: .leading)
@@ -671,7 +693,9 @@ struct OutdatedPackagesView: View {
                             Button {
                                 let isCask = package.source == "cask"
                                 var args = ["uninstall"]
-                                if isCask { args.append("--cask") }
+                                if isCask {
+                                    args.append("--cask")
+                                }
                                 args.append(package.name)
                                 onRunBrewTask("Uninstalling \(package.name)...", args)
                             } label: {
